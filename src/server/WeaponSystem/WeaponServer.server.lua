@@ -27,7 +27,7 @@ local function getEquippedTool(player, weaponName)
 	return nil
 end
 
-local function getAimOrigin(character)
+local function getRayOrigin(character)
 	local head = character:FindFirstChild("Head")
 	if head then
 		return head.Position
@@ -75,6 +75,8 @@ local function canFire(player, weaponName, cooldown)
 end
 
 local function onWeaponFire(player, weaponName, targetPosition)
+	print("[WeaponServer] Fire request")
+
 	if typeof(weaponName) ~= "string" or typeof(targetPosition) ~= "Vector3" then
 		return
 	end
@@ -97,24 +99,30 @@ local function onWeaponFire(player, weaponName, targetPosition)
 		return
 	end
 
-	local origin = getAimOrigin(character)
-	if not origin then
+	local rayOrigin = getRayOrigin(character)
+	if not rayOrigin then
 		return
 	end
 
-	local aimDirection = targetPosition - origin
-	if aimDirection.Magnitude <= 0 then
+	local rayDirection = targetPosition - rayOrigin
+	if rayDirection.Magnitude <= 0 then
 		return
 	end
+
+	local direction = rayDirection.Unit * settings.Range
+	print("[WeaponServer] Target position", targetPosition)
+	print("[WeaponServer] Ray direction", direction)
 
 	local raycastParams = RaycastParams.new()
 	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 	raycastParams.FilterDescendantsInstances = { character }
 
-	local result = workspace:Raycast(origin, aimDirection.Unit * settings.Range, raycastParams)
+	local result = workspace:Raycast(rayOrigin, direction, raycastParams)
 	if not result then
 		return
 	end
+
+	print("[WeaponServer] Hit object " .. result.Instance.Name)
 
 	local humanoid = findHumanoidFromHit(result.Instance)
 	if not humanoid or humanoid.Health <= 0 then
@@ -125,8 +133,11 @@ local function onWeaponFire(player, weaponName, targetPosition)
 		return
 	end
 
+	print("[WeaponServer] Humanoid found")
+
 	-- Damage is always chosen by the server, never by the client request.
 	humanoid:TakeDamage(settings.Damage)
+	print("[WeaponServer] Damage applied")
 end
 
 WeaponFire.OnServerEvent:Connect(onWeaponFire)

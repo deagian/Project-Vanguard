@@ -44,7 +44,7 @@ local function connectPistol(tool)
 			return
 		end
 
-		-- Send only the weapon name and aim point. The server validates everything else.
+		-- Send only where the player aimed. The server chooses the ray origin, range, and damage.
 		WeaponFire:FireServer(WEAPON_NAME, mouse.Hit.Position)
 	end)
 end

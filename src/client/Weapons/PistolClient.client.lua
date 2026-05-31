@@ -5,7 +5,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = Shared:WaitForChild("Remotes")
@@ -40,12 +39,21 @@ local function connectPistol(tool)
 	tool.Activated:Connect(function()
 		print("[WeaponClient] Activated")
 
-		if equippedTool ~= tool or not mouse.Hit then
+		if equippedTool ~= tool then
 			return
 		end
 
-		-- Send only where the player aimed. The server chooses the ray origin, range, and damage.
-		WeaponFire:FireServer(WEAPON_NAME, mouse.Hit.Position)
+		local camera = workspace.CurrentCamera
+		if not camera then
+			return
+		end
+
+		local viewportSize = camera.ViewportSize
+		local centerRay = camera:ViewportPointToRay(viewportSize.X / 2, viewportSize.Y / 2)
+
+		-- Send only the aim direction. The server chooses the ray origin, range, hit, and damage.
+		print("[WeaponClient] Fire request sent")
+		WeaponFire:FireServer(WEAPON_NAME, centerRay.Direction)
 	end)
 end
 

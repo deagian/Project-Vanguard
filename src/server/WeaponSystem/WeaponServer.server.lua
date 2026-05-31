@@ -41,6 +41,22 @@ local function getRayOrigin(character)
 	return nil
 end
 
+local function getValidAimDirection(aimDirection)
+	if typeof(aimDirection) ~= "Vector3" then
+		return nil
+	end
+
+	if aimDirection.X ~= aimDirection.X or aimDirection.Y ~= aimDirection.Y or aimDirection.Z ~= aimDirection.Z then
+		return nil
+	end
+
+	if aimDirection.Magnitude <= 0 then
+		return nil
+	end
+
+	return aimDirection.Unit
+end
+
 local function findHumanoidFromHit(hitInstance)
 	local current = hitInstance
 
@@ -74,10 +90,10 @@ local function canFire(player, weaponName, cooldown)
 	return true
 end
 
-local function onWeaponFire(player, weaponName, targetPosition)
-	print("[WeaponServer] Fire request")
+local function onWeaponFire(player, weaponName, aimDirection)
+	print("[WeaponServer] Fire request", player.Name, weaponName)
 
-	if typeof(weaponName) ~= "string" or typeof(targetPosition) ~= "Vector3" then
+	if typeof(weaponName) ~= "string" then
 		return
 	end
 
@@ -99,26 +115,27 @@ local function onWeaponFire(player, weaponName, targetPosition)
 		return
 	end
 
+	local validatedDirection = getValidAimDirection(aimDirection)
+	if not validatedDirection then
+		print("[WeaponServer] Invalid aim direction")
+		return
+	end
+
 	local rayOrigin = getRayOrigin(character)
 	if not rayOrigin then
 		return
 	end
 
-	local rayDirection = targetPosition - rayOrigin
-	if rayDirection.Magnitude <= 0 then
-		return
-	end
-
-	local direction = rayDirection.Unit * settings.Range
-	print("[WeaponServer] Target position", targetPosition)
-	print("[WeaponServer] Ray direction", direction)
+	local rayDirection = validatedDirection * settings.Range
 
 	local raycastParams = RaycastParams.new()
 	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 	raycastParams.FilterDescendantsInstances = { character }
+	raycastParams.IgnoreWater = true
 
-	local result = workspace:Raycast(rayOrigin, direction, raycastParams)
+	local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
 	if not result then
+		print("[WeaponServer] Shot missed")
 		return
 	end
 
@@ -126,6 +143,7 @@ local function onWeaponFire(player, weaponName, targetPosition)
 
 	local humanoid = findHumanoidFromHit(result.Instance)
 	if not humanoid or humanoid.Health <= 0 then
+		print("[WeaponServer] Hit had no living humanoid")
 		return
 	end
 
@@ -133,11 +151,11 @@ local function onWeaponFire(player, weaponName, targetPosition)
 		return
 	end
 
-	print("[WeaponServer] Humanoid found")
+	local healthBefore = humanoid.Health
 
 	-- Damage is always chosen by the server, never by the client request.
 	humanoid:TakeDamage(settings.Damage)
-	print("[WeaponServer] Damage applied")
+	print("[WeaponServer] Damage applied", healthBefore, "->", humanoid.Health)
 end
 
 WeaponFire.OnServerEvent:Connect(onWeaponFire)

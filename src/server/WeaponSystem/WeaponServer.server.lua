@@ -41,22 +41,6 @@ local function getRayOrigin(character)
 	return nil
 end
 
-local function getValidAimDirection(aimDirection)
-	if typeof(aimDirection) ~= "Vector3" then
-		return nil
-	end
-
-	if aimDirection.X ~= aimDirection.X or aimDirection.Y ~= aimDirection.Y or aimDirection.Z ~= aimDirection.Z then
-		return nil
-	end
-
-	if aimDirection.Magnitude <= 0 then
-		return nil
-	end
-
-	return aimDirection.Unit
-end
-
 local function findHumanoidFromHit(hitInstance)
 	local current = hitInstance
 
@@ -90,10 +74,10 @@ local function canFire(player, weaponName, cooldown)
 	return true
 end
 
-local function onWeaponFire(player, weaponName, aimDirection)
+local function onWeaponFire(player, weaponName, targetPosition)
 	print("[WeaponServer] Fire request", player.Name, weaponName)
 
-	if typeof(weaponName) ~= "string" then
+	if typeof(weaponName) ~= "string" or typeof(targetPosition) ~= "Vector3" then
 		return
 	end
 
@@ -115,18 +99,17 @@ local function onWeaponFire(player, weaponName, aimDirection)
 		return
 	end
 
-	local validatedDirection = getValidAimDirection(aimDirection)
-	if not validatedDirection then
-		print("[WeaponServer] Invalid aim direction")
-		return
-	end
-
 	local rayOrigin = getRayOrigin(character)
 	if not rayOrigin then
 		return
 	end
 
-	local rayDirection = validatedDirection * settings.Range
+	local targetDirection = targetPosition - rayOrigin
+	if targetDirection.Magnitude <= 0 then
+		return
+	end
+
+	local rayDirection = targetDirection.Unit * settings.Range
 
 	local raycastParams = RaycastParams.new()
 	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -152,6 +135,7 @@ local function onWeaponFire(player, weaponName, aimDirection)
 	end
 
 	local healthBefore = humanoid.Health
+	print("[WeaponServer] Humanoid found")
 
 	-- Damage is always chosen by the server, never by the client request.
 	humanoid:TakeDamage(settings.Damage)

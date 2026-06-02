@@ -1,10 +1,13 @@
 -- TestArena creates a small temporary weapon testing space.
 -- It is only for local testing and does not change weapon, HUD, or stamina logic.
 
+local TweenService = game:GetService("TweenService")
+
 local ARENA_NAME = "TestArena"
 local TARGET_SPAWN_CFRAME = CFrame.new(0, 3, -35)
 local TARGET_HEAD_CFRAME = CFrame.new(0, 5, -35)
 local TARGET_RESPAWN_TIME = 3
+local DAMAGE_NUMBER_TIME = 0.5
 
 local function createPart(name, size, cframe, color, parent)
 	local part = Instance.new("Part")
@@ -20,6 +23,43 @@ local function createPart(name, size, cframe, color, parent)
 	part.Parent = parent
 
 	return part
+end
+
+local function showFloatingDamage(head, damageAmount)
+	local isHeadshotDamage = damageAmount >= 40
+	local textColor = if isHeadshotDamage then Color3.fromRGB(255, 55, 55) else Color3.fromRGB(255, 255, 255)
+
+	local billboardGui = Instance.new("BillboardGui")
+	billboardGui.Name = "DamageNumber"
+	billboardGui.Adornee = head
+	billboardGui.AlwaysOnTop = true
+	billboardGui.Size = UDim2.fromOffset(100, 40)
+	billboardGui.StudsOffset = Vector3.new(0, 1.45, 0)
+	billboardGui.Parent = head
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.GothamBold
+	label.Text = tostring(damageAmount)
+	label.TextColor3 = textColor
+	label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	label.TextStrokeTransparency = 0.25
+	label.TextSize = 28
+	label.Parent = billboardGui
+
+	local tweenInfo = TweenInfo.new(DAMAGE_NUMBER_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(billboardGui, tweenInfo, { StudsOffset = Vector3.new(0, 2.35, 0) }):Play()
+	TweenService:Create(label, tweenInfo, {
+		TextTransparency = 1,
+		TextStrokeTransparency = 1,
+	}):Play()
+
+	task.delay(DAMAGE_NUMBER_TIME, function()
+		if billboardGui.Parent then
+			billboardGui:Destroy()
+		end
+	end)
 end
 
 local function createTargetDummy(parent)
@@ -54,7 +94,7 @@ local function createTargetDummy(parent)
 		dummy
 	)
 
-	createPart(
+	local head = createPart(
 		"Head",
 		Vector3.new(1.25, 1.25, 1.25),
 		TARGET_HEAD_CFRAME,
@@ -63,6 +103,16 @@ local function createTargetDummy(parent)
 	)
 
 	dummy.PrimaryPart = root
+	local lastHealth = humanoid.Health
+
+	humanoid.HealthChanged:Connect(function(newHealth)
+		if newHealth < lastHealth then
+			local damageAmount = math.round(lastHealth - newHealth)
+			showFloatingDamage(head, damageAmount)
+		end
+
+		lastHealth = newHealth
+	end)
 
 	-- Reset the target after it is defeated so damage can be tested repeatedly.
 	humanoid.Died:Connect(function()

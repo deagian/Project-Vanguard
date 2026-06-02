@@ -12,6 +12,8 @@ local Remotes = Shared:WaitForChild("Remotes")
 local WeaponHitConfirm = Remotes:WaitForChild("WeaponHitConfirm")
 
 local HIT_MARKER_DURATION = 0.12
+local BODY_HIT_COLOR = Color3.fromRGB(255, 255, 255)
+local HEADSHOT_HIT_COLOR = Color3.fromRGB(255, 55, 55)
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "HitMarkerGui"
@@ -32,10 +34,11 @@ markerFrame.Parent = screenGui
 
 local function createMarkerLine(rotation)
 	local line = Instance.new("Frame")
+	line.Name = "HitMarkerLine"
 	line.AnchorPoint = Vector2.new(0.5, 0.5)
 	line.Position = UDim2.fromScale(0.5, 0.5)
 	line.Size = UDim2.fromOffset(28, 3)
-	line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	line.BackgroundColor3 = BODY_HIT_COLOR
 	line.BorderSizePixel = 0
 	line.Rotation = rotation
 	line.ZIndex = 20
@@ -51,9 +54,23 @@ createMarkerLine(-45)
 
 local markerToken = 0
 
-local function showHitMarker()
+local function setMarkerColor(color)
+	for _, child in ipairs(markerFrame:GetChildren()) do
+		if child:IsA("Frame") and child.Name == "HitMarkerLine" then
+			child.BackgroundColor3 = color
+		end
+	end
+end
+
+local function showHitMarker(isHeadshot)
 	markerToken += 1
 	local currentToken = markerToken
+
+	if isHeadshot then
+		setMarkerColor(HEADSHOT_HIT_COLOR)
+	else
+		setMarkerColor(BODY_HIT_COLOR)
+	end
 
 	print("[WeaponClient] Hit marker shown")
 	markerFrame.Visible = true

@@ -138,12 +138,22 @@ local function onWeaponFire(player, weaponName, targetPosition)
 	local healthBefore = humanoid.Health
 	print("[WeaponServer] Humanoid found")
 
+	local isHeadshot = result.Instance.Name == "Head"
+	local damage = settings.Damage
+
+	if isHeadshot then
+		damage *= 2
+		print("[WeaponServer] Headshot")
+	else
+		print("[WeaponServer] Body shot")
+	end
+
 	-- Damage is always chosen by the server, never by the client request.
-	humanoid:TakeDamage(settings.Damage)
+	humanoid:TakeDamage(damage)
 	print("[WeaponServer] Damage applied", healthBefore, "->", humanoid.Health)
 
 	print("[WeaponServer] Hit confirmed")
-	WeaponHitConfirm:FireClient(player)
+	WeaponHitConfirm:FireClient(player, isHeadshot)
 end
 
 WeaponFire.OnServerEvent:Connect(onWeaponFire)

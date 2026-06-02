@@ -10,6 +10,7 @@ local Remotes = Shared:WaitForChild("Remotes")
 
 local WeaponConfig = require(Modules:WaitForChild("WeaponConfig"))
 local WeaponFire = Remotes:WaitForChild("WeaponFire")
+local WeaponHitConfirm = Remotes:WaitForChild("WeaponHitConfirm")
 
 local lastFireTimes = {}
 
@@ -140,6 +141,9 @@ local function onWeaponFire(player, weaponName, targetPosition)
 	-- Damage is always chosen by the server, never by the client request.
 	humanoid:TakeDamage(settings.Damage)
 	print("[WeaponServer] Damage applied", healthBefore, "->", humanoid.Health)
+
+	print("[WeaponServer] Hit confirmed")
+	WeaponHitConfirm:FireClient(player)
 end
 
 WeaponFire.OnServerEvent:Connect(onWeaponFire)

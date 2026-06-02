@@ -3,20 +3,160 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Modules = Shared:WaitForChild("Modules")
 local Remotes = Shared:WaitForChild("Remotes")
+local WeaponConfig = require(Modules:WaitForChild("WeaponConfig"))
 local WeaponFire = Remotes:WaitForChild("WeaponFire")
 
 local WEAPON_NAME = "Pistol"
+local PISTOL_CONFIG = WeaponConfig[WEAPON_NAME]
+local MUZZLE_FLASH_TIME = 0.05
+local RECOIL_KICK = 1.4
+local RECOIL_RETURN_SPEED = 18
+local FIRE_SOUND_ID = "rbxassetid://9119561046"
+-- TODO: Replace with a Project Vanguard-owned public reload sound ID.
+local RELOAD_SOUND_ID = ""
+-- TODO: Replace with a Project Vanguard-owned public empty click sound ID if this placeholder causes access errors.
+local EMPTY_SOUND_ID = "rbxassetid://9117969717"
 
 local connectedTools = {}
 local equippedTool = nil
+local currentAmmo = PISTOL_CONFIG.MagazineSize
+local isReloading = false
+local recoilAmount = 0
 
 print("[WeaponClient] Loaded")
+
+RunService.RenderStepped:Connect(function(deltaTime)
+	if recoilAmount <= 0 then
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	if camera then
+		camera.CFrame *= CFrame.Angles(math.rad(-recoilAmount), 0, 0)
+	end
+
+	recoilAmount = math.max(0, recoilAmount - RECOIL_RETURN_SPEED * deltaTime)
+end)
+
+local function getSoundParent(tool)
+	return tool:FindFirstChild("Handle") or tool
+end
+
+local function playTemporarySound(tool, soundId, volume)
+	if soundId == "" then
+		return
+	end
+
+	local sound = Instance.new("Sound")
+	sound.SoundId = soundId
+	sound.Volume = volume
+	sound.RollOffMaxDistance = 80
+	sound.Parent = getSoundParent(tool)
+	sound:Play()
+
+	sound.Ended:Connect(function()
+		sound:Destroy()
+	end)
+
+	task.delay(3, function()
+		if sound.Parent then
+			sound:Destroy()
+		end
+	end)
+end
+
+local function showMuzzleFlash(tool)
+	local barrel = tool:FindFirstChild("Barrel")
+	if not barrel or not barrel:IsA("BasePart") then
+		return
+	end
+
+	local flash = barrel:FindFirstChild("MuzzleFlash")
+	if not flash then
+		flash = Instance.new("PointLight")
+		flash.Name = "MuzzleFlash"
+		flash.Brightness = 7
+		flash.Range = 8
+		flash.Color = Color3.fromRGB(255, 235, 170)
+		flash.Enabled = false
+		flash.Parent = barrel
+	end
+
+	local flashPart = barrel:FindFirstChild("MuzzleFlashPart")
+	if not flashPart then
+		flashPart = Instance.new("Part")
+		flashPart.Name = "MuzzleFlashPart"
+		flashPart.Shape = Enum.PartType.Ball
+		flashPart.Size = Vector3.new(0.22, 0.22, 0.22)
+		flashPart.Material = Enum.Material.Neon
+		flashPart.Color = Color3.fromRGB(255, 220, 120)
+		flashPart.Transparency = 1
+		flashPart.CanCollide = false
+		flashPart.CanQuery = false
+		flashPart.CanTouch = false
+		flashPart.Massless = true
+		flashPart.CFrame = barrel.CFrame * CFrame.new(0, 0, -barrel.Size.Z / 2 - 0.08)
+		flashPart.Parent = barrel
+
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = barrel
+		weld.Part1 = flashPart
+		weld.Parent = flashPart
+	end
+
+	print("[WeaponClient] Muzzle flash")
+	flash.Enabled = true
+	flashPart.Transparency = 0
+
+	task.delay(MUZZLE_FLASH_TIME, function()
+		if flash.Parent then
+			flash.Enabled = false
+		end
+
+		if flashPart.Parent then
+			flashPart.Transparency = 1
+		end
+	end)
+end
+
+local function applyRecoil()
+	recoilAmount += RECOIL_KICK
+	print("[WeaponClient] Recoil applied")
+end
+
+local function updateAmmoState()
+	player:SetAttribute("PistolAmmo", currentAmmo)
+	player:SetAttribute("PistolMaxAmmo", PISTOL_CONFIG.MagazineSize)
+	player:SetAttribute("PistolReloading", isReloading)
+	print("[WeaponClient] Ammo", currentAmmo .. " / " .. PISTOL_CONFIG.MagazineSize)
+end
+
+local function reloadPistol()
+	if isReloading or currentAmmo == PISTOL_CONFIG.MagazineSize then
+		return
+	end
+
+	isReloading = true
+	updateAmmoState()
+	print("[WeaponClient] Reload started")
+	playTemporarySound(equippedTool, RELOAD_SOUND_ID, 0.55)
+
+	task.delay(PISTOL_CONFIG.ReloadTime, function()
+		currentAmmo = PISTOL_CONFIG.MagazineSize
+		isReloading = false
+		updateAmmoState()
+		print("[WeaponClient] Reload complete")
+	end)
+end
 
 local function connectPistol(tool)
 	if not tool:IsA("Tool") or tool.Name ~= WEAPON_NAME or connectedTools[tool] then
@@ -40,9 +180,22 @@ local function connectPistol(tool)
 	tool.Activated:Connect(function()
 		print("[WeaponClient] Activated")
 
-		if equippedTool ~= tool or not mouse.Hit then
+		if equippedTool ~= tool or isReloading or not mouse.Hit then
 			return
 		end
+
+		if currentAmmo <= 0 then
+			print("[WeaponClient] Empty magazine")
+			playTemporarySound(tool, EMPTY_SOUND_ID, 0.45)
+			return
+		end
+
+		currentAmmo -= 1
+		updateAmmoState()
+		showMuzzleFlash(tool)
+		playTemporarySound(tool, FIRE_SOUND_ID, 0.75)
+		print("[WeaponClient] Fire sound")
+		applyRecoil()
 
 		-- Send only the aimed position. The server chooses the origin, range, hit, and damage.
 		print("[WeaponClient] Fire request sent")
@@ -72,6 +225,14 @@ end
 
 local backpack = player:WaitForChild("Backpack")
 
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed or input.KeyCode ~= Enum.KeyCode.R or not equippedTool then
+		return
+	end
+
+	reloadPistol()
+end)
+
 local function setupCharacter(character)
 	equippedTool = nil
 
@@ -82,5 +243,6 @@ end
 
 local character = player.Character or player.CharacterAdded:Wait()
 setupCharacter(character)
+updateAmmoState()
 
 player.CharacterAdded:Connect(setupCharacter)

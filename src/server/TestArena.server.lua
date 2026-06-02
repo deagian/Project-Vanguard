@@ -2,6 +2,9 @@
 -- It is only for local testing and does not change weapon, HUD, or stamina logic.
 
 local ARENA_NAME = "TestArena"
+local TARGET_SPAWN_CFRAME = CFrame.new(0, 3, -35)
+local TARGET_HEAD_CFRAME = CFrame.new(0, 5, -35)
+local TARGET_RESPAWN_TIME = 3
 
 local function createPart(name, size, cframe, color, parent)
 	local part = Instance.new("Part")
@@ -37,7 +40,7 @@ local function createTargetDummy(parent)
 	local root = createPart(
 		"HumanoidRootPart",
 		Vector3.new(2, 2, 1),
-		CFrame.new(0, 3, -35),
+		TARGET_SPAWN_CFRAME,
 		bodyColor,
 		dummy
 	)
@@ -46,7 +49,7 @@ local function createTargetDummy(parent)
 	createPart(
 		"Torso",
 		Vector3.new(2, 2.5, 1),
-		CFrame.new(0, 3, -35),
+		TARGET_SPAWN_CFRAME,
 		hitColor,
 		dummy
 	)
@@ -54,7 +57,7 @@ local function createTargetDummy(parent)
 	createPart(
 		"Head",
 		Vector3.new(1.25, 1.25, 1.25),
-		CFrame.new(0, 5, -35),
+		TARGET_HEAD_CFRAME,
 		Color3.fromRGB(190, 190, 185),
 		dummy
 	)
@@ -63,11 +66,14 @@ local function createTargetDummy(parent)
 
 	-- Reset the target after it is defeated so damage can be tested repeatedly.
 	humanoid.Died:Connect(function()
-		task.wait(3)
+		print("[Target] Eliminated")
+		task.wait(TARGET_RESPAWN_TIME)
 
 		if dummy.Parent then
+			print("[Target] Respawning")
 			dummy:Destroy()
 			createTargetDummy(parent)
+			print("[Target] Respawn complete")
 		end
 	end)
 

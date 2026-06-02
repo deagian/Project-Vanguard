@@ -6,6 +6,8 @@ local WeaponConfig = {
 		Damage = 20,
 		Range = 300,
 		FireCooldown = 0.35,
+		MagazineSize = 12,
+		ReloadTime = 1.5,
 	},
 }
 

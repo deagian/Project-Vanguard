@@ -143,4 +143,17 @@ function MovementController:GetMaxStamina()
 	return GameSettings.MaxStamina
 end
 
+function MovementController:IsSprinting()
+	return isSprinting
+end
+
+function MovementController:ConsumeStamina(amount)
+	-- Consumo locale finche la stamina non viene validata dal server.
+	stamina = math.max(0, stamina - amount)
+
+	if stamina <= 0 and isSprinting then
+		stopSprint()
+	end
+end
+
 return MovementController

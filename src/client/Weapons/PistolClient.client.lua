@@ -14,11 +14,13 @@ local Modules = Shared:WaitForChild("Modules")
 local Remotes = Shared:WaitForChild("Remotes")
 local WeaponConfig = require(Modules:WaitForChild("WeaponConfig"))
 local WeaponFire = Remotes:WaitForChild("WeaponFire")
+local ADSController = require(script.Parent:WaitForChild("ADSController"))
 
 local WEAPON_NAME = "Pistol"
 local PISTOL_CONFIG = WeaponConfig[WEAPON_NAME]
 local MUZZLE_FLASH_TIME = 0.05
 local RECOIL_KICK = 1.4
+local ADS_RECOIL_MULTIPLIER = 0.65
 local RECOIL_RETURN_SPEED = 18
 local FIRE_SOUND_ID = "rbxassetid://9119561046"
 -- TODO: Replace with a Project Vanguard-owned public reload sound ID.
@@ -129,8 +131,42 @@ local function showMuzzleFlash(tool)
 end
 
 local function applyRecoil()
-	recoilAmount += RECOIL_KICK
+	local recoilMultiplier = 1
+	if ADSController:IsADS() then
+		recoilMultiplier = ADS_RECOIL_MULTIPLIER
+	end
+
+	recoilAmount += RECOIL_KICK * recoilMultiplier
 	print("[WeaponClient] Recoil applied")
+end
+
+local function applySpread(targetPosition)
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return targetPosition
+	end
+
+	local spreadDegrees = PISTOL_CONFIG.HipFireSpread or 0
+	if ADSController:IsADS() then
+		spreadDegrees = PISTOL_CONFIG.ADSSpread or spreadDegrees
+	end
+
+	if spreadDegrees <= 0 then
+		return targetPosition
+	end
+
+	local origin = camera.CFrame.Position
+	local aimDirection = targetPosition - origin
+	if aimDirection.Magnitude <= 0 then
+		return targetPosition
+	end
+
+	local yaw = math.rad((math.random() * 2 - 1) * spreadDegrees)
+	local pitch = math.rad((math.random() * 2 - 1) * spreadDegrees)
+	local spreadCFrame = CFrame.lookAt(Vector3.zero, aimDirection.Unit) * CFrame.Angles(pitch, yaw, 0)
+	local spreadDirection = spreadCFrame.LookVector
+
+	return origin + spreadDirection * aimDirection.Magnitude
 end
 
 local function updateAmmoState()
@@ -168,12 +204,14 @@ local function connectPistol(tool)
 
 	tool.Equipped:Connect(function()
 		equippedTool = tool
+		ADSController:SetWeaponEquipped(true)
 		print("[WeaponClient] Equipped")
 	end)
 
 	tool.Unequipped:Connect(function()
 		if equippedTool == tool then
 			equippedTool = nil
+			ADSController:SetWeaponEquipped(false)
 		end
 	end)
 
@@ -199,7 +237,7 @@ local function connectPistol(tool)
 
 		-- Send only the aimed position. The server chooses the origin, range, hit, and damage.
 		print("[WeaponClient] Fire request sent")
-		WeaponFire:FireServer(WEAPON_NAME, mouse.Hit.Position)
+		WeaponFire:FireServer(WEAPON_NAME, applySpread(mouse.Hit.Position))
 	end)
 end
 
@@ -235,6 +273,7 @@ end)
 
 local function setupCharacter(character)
 	equippedTool = nil
+	ADSController:SetWeaponEquipped(false)
 
 	watchContainer(backpack)
 	watchContainer(character)

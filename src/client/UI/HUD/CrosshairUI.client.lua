@@ -2,12 +2,20 @@
 -- It only handles UI visibility and does not change weapon firing logic.
 
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local WEAPON_NAME = "Pistol"
 
+local CROSSHAIR_TWEEN_INFO = TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+local NORMAL_CROSSHAIR_SIZE = UDim2.fromOffset(42, 42)
+local ADS_CROSSHAIR_SIZE = UDim2.fromOffset(26, 26)
+local NORMAL_SPREAD = 12
+local ADS_SPREAD = 7
+
 local crosshairGui = nil
 local crosshairFrame = nil
+local crosshairLines = {}
 local connectedTools = {}
 local watchedContainers = {}
 
@@ -32,6 +40,49 @@ local function createLine(parent, name, size, position)
 	line.BorderSizePixel = 0
 	line.ZIndex = 11
 	line.Parent = outline
+
+	crosshairLines[name] = outline
+end
+
+local function tweenGuiObject(guiObject, properties)
+	TweenService:Create(guiObject, CROSSHAIR_TWEEN_INFO, properties):Play()
+end
+
+local function applyCrosshairStyle(isADS)
+	if not crosshairFrame then
+		return
+	end
+
+	local size = if isADS then ADS_CROSSHAIR_SIZE else NORMAL_CROSSHAIR_SIZE
+	local spread = if isADS then ADS_SPREAD else NORMAL_SPREAD
+
+	tweenGuiObject(crosshairFrame, {
+		Size = size,
+	})
+
+	if crosshairLines.Top then
+		tweenGuiObject(crosshairLines.Top, {
+			Position = UDim2.new(0.5, 0, 0.5, -spread),
+		})
+	end
+
+	if crosshairLines.Bottom then
+		tweenGuiObject(crosshairLines.Bottom, {
+			Position = UDim2.new(0.5, 0, 0.5, spread),
+		})
+	end
+
+	if crosshairLines.Left then
+		tweenGuiObject(crosshairLines.Left, {
+			Position = UDim2.new(0.5, -spread, 0.5, 0),
+		})
+	end
+
+	if crosshairLines.Right then
+		tweenGuiObject(crosshairLines.Right, {
+			Position = UDim2.new(0.5, spread, 0.5, 0),
+		})
+	end
 end
 
 local function createCrosshairGui()
@@ -40,6 +91,13 @@ local function createCrosshairGui()
 	crosshairGui = playerGui:FindFirstChild("CrosshairGui")
 	if crosshairGui then
 		crosshairFrame = crosshairGui:FindFirstChild("Crosshair")
+		if crosshairFrame then
+			crosshairLines.Top = crosshairFrame:FindFirstChild("TopOutline")
+			crosshairLines.Bottom = crosshairFrame:FindFirstChild("BottomOutline")
+			crosshairLines.Left = crosshairFrame:FindFirstChild("LeftOutline")
+			crosshairLines.Right = crosshairFrame:FindFirstChild("RightOutline")
+			applyCrosshairStyle(player:GetAttribute("ADSActive") == true)
+		end
 		return
 	end
 
@@ -65,6 +123,7 @@ local function createCrosshairGui()
 	createLine(crosshairFrame, "Bottom", UDim2.fromOffset(4, 10), UDim2.new(0.5, 0, 0.5, 12))
 	createLine(crosshairFrame, "Left", UDim2.fromOffset(10, 4), UDim2.new(0.5, -12, 0.5, 0))
 	createLine(crosshairFrame, "Right", UDim2.fromOffset(10, 4), UDim2.new(0.5, 12, 0.5, 0))
+	applyCrosshairStyle(player:GetAttribute("ADSActive") == true)
 end
 
 -- Visibility control
@@ -118,3 +177,7 @@ if player.Character then
 end
 
 player.CharacterAdded:Connect(setupCharacter)
+
+player:GetAttributeChangedSignal("ADSActive"):Connect(function()
+	applyCrosshairStyle(player:GetAttribute("ADSActive") == true)
+end)

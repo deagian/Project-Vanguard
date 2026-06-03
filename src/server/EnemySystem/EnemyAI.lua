@@ -6,6 +6,9 @@ local Debris = game:GetService("Debris")
 
 local EnemyAI = {}
 
+local LOST_SIGHT_MEMORY_TIME = 3
+local ENEMY_GUN_SOUND_ID = "rbxassetid://9119561046"
+
 local function getAliveCharacterParts(player)
 	local character = player.Character
 	if not character then
@@ -90,14 +93,7 @@ local function hasLineOfSight(enemyModel, enemyRootPart, targetCharacter)
 
 	local result = workspace:Raycast(origin, direction, raycastParams)
 	if result and result.Instance:IsDescendantOf(targetCharacter) then
-		print("[EnemyAI] Line of sight confirmed")
 		return true
-	end
-
-	if result then
-		print("[EnemyAI] Line of sight blocked by " .. result.Instance.Name)
-	else
-		print("[EnemyAI] Line of sight blocked by nil")
 	end
 
 	return false
@@ -142,6 +138,21 @@ local function playMuzzleFlash(enemyModel, enemyRootPart)
 	Debris:AddItem(flash, 0.08)
 end
 
+local function playGunSound(enemyModel, enemyRootPart)
+	local soundParent = enemyModel:FindFirstChild("EnemyRifle", true) or enemyRootPart
+
+	local sound = Instance.new("Sound")
+	sound.Name = "EnemyGunshot"
+	sound.SoundId = ENEMY_GUN_SOUND_ID
+	sound.Volume = 0.28
+	sound.RollOffMaxDistance = 85
+	sound.RollOffMinDistance = 8
+	sound.Parent = soundParent
+	sound:Play()
+
+	Debris:AddItem(sound, 2)
+end
+
 local function playTracer(enemyModel, enemyRootPart, targetPosition)
 	local muzzlePosition = getMuzzlePosition(enemyModel, enemyRootPart)
 	local direction = targetPosition - muzzlePosition
@@ -156,12 +167,36 @@ local function playTracer(enemyModel, enemyRootPart, targetPosition)
 	tracer.CanQuery = false
 	tracer.CanTouch = false
 	tracer.Material = Enum.Material.Neon
-	tracer.Color = Color3.fromRGB(255, 80, 55)
-	tracer.Size = Vector3.new(0.08, 0.08, direction.Magnitude)
+	tracer.Color = Color3.fromRGB(255, 140, 45)
+	tracer.Size = Vector3.new(0.12, 0.12, direction.Magnitude)
 	tracer.CFrame = CFrame.lookAt(muzzlePosition + direction * 0.5, targetPosition)
 	tracer.Parent = workspace
 
 	Debris:AddItem(tracer, 0.08)
+end
+
+local function playHitReaction(enemyModel)
+	local originalStates = {}
+
+	for _, descendant in ipairs(enemyModel:GetDescendants()) do
+		if descendant:IsA("BasePart") and descendant.Name ~= "HumanoidRootPart" then
+			originalStates[descendant] = {
+				Color = descendant.Color,
+				Material = descendant.Material,
+			}
+			descendant.Color = Color3.fromRGB(255, 45, 45)
+			descendant.Material = Enum.Material.Neon
+		end
+	end
+
+	task.delay(0.08, function()
+		for part, state in pairs(originalStates) do
+			if part.Parent then
+				part.Color = state.Color
+				part.Material = state.Material
+			end
+		end
+	end)
 end
 
 function EnemyAI.Start(enemyModel, config, homePosition)
@@ -177,8 +212,19 @@ function EnemyAI.Start(enemyModel, config, homePosition)
 	local currentTarget = nil
 	local lastAttackTime = 0
 	local lastPatrolTime = 0
+	local lastKnownPlayerPosition = nil
+	local lastSeenTime = 0
+	local lastHealth = humanoid.Health
 
 	humanoid.WalkSpeed = config.WalkSpeed
+
+	humanoid.HealthChanged:Connect(function(newHealth)
+		if newHealth < lastHealth and newHealth > 0 then
+			playHitReaction(enemyModel)
+		end
+
+		lastHealth = newHealth
+	end)
 
 	humanoid.Died:Connect(function()
 		alive = false
@@ -197,20 +243,36 @@ function EnemyAI.Start(enemyModel, config, homePosition)
 				end
 
 				faceTarget(rootPart, targetRootPart.Position)
+				local hasLOS = hasLineOfSight(enemyModel, rootPart, targetCharacter)
+				if hasLOS then
+					lastKnownPlayerPosition = targetRootPart.Position
+					lastSeenTime = os.clock()
+				end
+
+				local now = os.clock()
+				local hasRecentLastKnownPosition = lastKnownPlayerPosition ~= nil and now - lastSeenTime <= LOST_SIGHT_MEMORY_TIME
 
 				if distance > config.AttackRange then
-					humanoid:MoveTo(targetRootPart.Position)
+					if hasLOS or not lastKnownPlayerPosition then
+						humanoid:MoveTo(targetRootPart.Position)
+					elseif hasRecentLastKnownPosition then
+						humanoid:MoveTo(lastKnownPlayerPosition)
+					else
+						lastKnownPlayerPosition = nil
+						currentTarget = nil
+					end
+				elseif not hasLOS and hasRecentLastKnownPosition then
+					humanoid:MoveTo(lastKnownPlayerPosition)
 				else
 					humanoid:MoveTo(rootPart.Position)
 
-					local now = os.clock()
-					if now - lastAttackTime >= config.FireCooldown then
-						lastAttackTime = now
-
-						if targetHumanoid.Health > 0 and humanoid.Health > 0 and hasLineOfSight(enemyModel, rootPart, targetCharacter) then
+					if hasLOS and now - lastAttackTime >= config.FireCooldown then
+						if targetHumanoid.Health > 0 and humanoid.Health > 0 then
+							lastAttackTime = now
 							local targetAimPart = getAimPart(targetCharacter) or targetRootPart
 							print("[EnemyAI] Enemy attacking player")
 							playMuzzleFlash(enemyModel, rootPart)
+							playGunSound(enemyModel, rootPart)
 							playTracer(enemyModel, rootPart, targetAimPart.Position)
 							targetHumanoid:TakeDamage(config.Damage)
 							print("[EnemyAI] Player damaged amount=" .. tostring(config.Damage))
@@ -221,7 +283,10 @@ function EnemyAI.Start(enemyModel, config, homePosition)
 				currentTarget = nil
 
 				local now = os.clock()
-				if now - lastPatrolTime >= config.PatrolCooldown then
+				if lastKnownPlayerPosition and now - lastSeenTime <= LOST_SIGHT_MEMORY_TIME then
+					humanoid:MoveTo(lastKnownPlayerPosition)
+				elseif now - lastPatrolTime >= config.PatrolCooldown then
+					lastKnownPlayerPosition = nil
 					lastPatrolTime = now
 					humanoid:MoveTo(getPatrolPoint(homePosition, config.PatrolRadius))
 				end

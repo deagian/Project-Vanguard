@@ -8,6 +8,7 @@ local EnemyAI = {}
 
 local LOST_SIGHT_MEMORY_TIME = 3
 local ENEMY_GUN_SOUND_ID = "rbxassetid://9119561046"
+local ATTACK_LOG_COOLDOWN = 6
 
 local function getAliveCharacterParts(player)
 	local character = player.Character
@@ -215,6 +216,7 @@ function EnemyAI.Start(enemyModel, config, homePosition)
 	local lastKnownPlayerPosition = nil
 	local lastSeenTime = 0
 	local lastHealth = humanoid.Health
+	local lastAttackLogTime = 0
 
 	humanoid.WalkSpeed = config.WalkSpeed
 
@@ -270,12 +272,17 @@ function EnemyAI.Start(enemyModel, config, homePosition)
 						if targetHumanoid.Health > 0 and humanoid.Health > 0 then
 							lastAttackTime = now
 							local targetAimPart = getAimPart(targetCharacter) or targetRootPart
-							print("[EnemyAI] Enemy attacking player")
 							playMuzzleFlash(enemyModel, rootPart)
 							playGunSound(enemyModel, rootPart)
 							playTracer(enemyModel, rootPart, targetAimPart.Position)
 							targetHumanoid:TakeDamage(config.Damage)
-							print("[EnemyAI] Player damaged amount=" .. tostring(config.Damage))
+
+							-- Log limitato per non riempire Output durante i test con piu' nemici.
+							if now - lastAttackLogTime >= ATTACK_LOG_COOLDOWN then
+								lastAttackLogTime = now
+								print("[EnemyAI] Enemy attacking player")
+								print("[EnemyAI] Player damaged amount=" .. tostring(config.Damage))
+							end
 						end
 					end
 				end

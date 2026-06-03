@@ -25,6 +25,32 @@ local enemyFolder = Instance.new("Folder")
 enemyFolder.Name = ENEMY_FOLDER_NAME
 enemyFolder.Parent = workspace
 
+local function getMapEnemySpawns()
+	local map = workspace:WaitForChild("Map", 10)
+	if not map then
+		return ENEMY_SPAWNS
+	end
+
+	local spawnsFolder = map:WaitForChild("Spawns", 5)
+	if not spawnsFolder then
+		return ENEMY_SPAWNS
+	end
+
+	local spawnCFrames = {}
+	for index = 1, 3 do
+		local spawnPart = spawnsFolder:FindFirstChild("EnemySpawn" .. index)
+		if spawnPart and spawnPart:IsA("BasePart") then
+			table.insert(spawnCFrames, CFrame.new(spawnPart.Position + Vector3.new(0, 4, 0)))
+		end
+	end
+
+	if #spawnCFrames == 0 then
+		return ENEMY_SPAWNS
+	end
+
+	return spawnCFrames
+end
+
 local function tintEnemy(model)
 	local bodyColors = model:FindFirstChildOfClass("BodyColors")
 	if bodyColors then
@@ -119,7 +145,7 @@ local function spawnEnemy(spawnCFrame)
 	return enemy
 end
 
-for _, spawnCFrame in ipairs(ENEMY_SPAWNS) do
+for _, spawnCFrame in ipairs(getMapEnemySpawns()) do
 	spawnEnemy(spawnCFrame)
 end
 

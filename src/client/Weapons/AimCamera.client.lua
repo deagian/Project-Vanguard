@@ -1,5 +1,5 @@
--- AimCamera gives the pistol a simple third-person over-the-shoulder feel.
--- It only adjusts local camera/mouse settings while the Pistol is equipped.
+-- AimCamera gives supported weapons a simple third-person over-the-shoulder feel.
+-- It only adjusts local camera/mouse settings while a supported weapon is equipped.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -10,7 +10,10 @@ local CAMERA_SMOOTHNESS = 0.15
 local SHOULDER_OFFSET = Vector3.new(2.2, 1.4, 0)
 
 local player = Players.LocalPlayer
-local WEAPON_NAME = "Pistol"
+local SUPPORTED_WEAPONS = {
+	Pistol = true,
+	AssaultRifle = true,
+}
 
 local connectedTools = {}
 local watchedContainers = {}
@@ -172,8 +175,8 @@ function disableAimCamera()
 	print("[AimCamera] Disabled")
 end
 
-local function connectPistol(tool)
-	if not tool:IsA("Tool") or tool.Name ~= WEAPON_NAME or connectedTools[tool] then
+local function connectWeapon(tool)
+	if not tool:IsA("Tool") or not SUPPORTED_WEAPONS[tool.Name] or connectedTools[tool] then
 		return
 	end
 
@@ -191,10 +194,10 @@ local function watchContainer(container)
 	watchedContainers[container] = true
 
 	for _, child in ipairs(container:GetChildren()) do
-		connectPistol(child)
+		connectWeapon(child)
 	end
 
-	container.ChildAdded:Connect(connectPistol)
+	container.ChildAdded:Connect(connectWeapon)
 end
 
 local function setupCharacter(character)

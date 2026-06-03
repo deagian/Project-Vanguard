@@ -142,7 +142,7 @@ local function onWeaponFire(player, weaponName, targetPosition)
 	local damage = settings.Damage
 
 	if isHeadshot then
-		damage *= 2
+		damage *= settings.HeadshotMultiplier or 2
 		print("[WeaponServer] Headshot")
 	else
 		print("[WeaponServer] Body shot")

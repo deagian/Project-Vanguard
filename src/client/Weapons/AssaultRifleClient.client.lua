@@ -1,5 +1,5 @@
--- PistolClient listens for the local player's Pistol Tool.
--- It only sends a fire request and aim point; the server decides hits and damage.
+-- AssaultRifleClient gestisce fuoco automatico, munizioni, reload e feedback locale.
+-- Il client invia solo richiesta e punto mirato: danno e hit detection restano server-side.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,7 +7,6 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Modules = Shared:WaitForChild("Modules")
@@ -16,25 +15,24 @@ local WeaponConfig = require(Modules:WaitForChild("WeaponConfig"))
 local WeaponFire = Remotes:WaitForChild("WeaponFire")
 local ADSController = require(script.Parent:WaitForChild("ADSController"))
 
-local WEAPON_NAME = "Pistol"
-local PISTOL_CONFIG = WeaponConfig[WEAPON_NAME]
-local MUZZLE_FLASH_TIME = 0.05
-local RECOIL_KICK = 1.4
-local ADS_RECOIL_MULTIPLIER = 0.65
-local RECOIL_RETURN_SPEED = 18
+local WEAPON_NAME = "AssaultRifle"
+local RIFLE_CONFIG = WeaponConfig[WEAPON_NAME]
+local MUZZLE_FLASH_TIME = 0.035
+local RECOIL_RETURN_SPEED = 22
 local FIRE_SOUND_ID = "rbxassetid://9119561046"
--- TODO: Replace with a Project Vanguard-owned public reload sound ID.
+-- TODO: sostituire con suoni proprietari Project Vanguard.
 local RELOAD_SOUND_ID = ""
--- TODO: Replace with a Project Vanguard-owned public empty click sound ID if this placeholder causes access errors.
 local EMPTY_SOUND_ID = "rbxassetid://9117969717"
 
 local connectedTools = {}
 local equippedTool = nil
-local currentAmmo = PISTOL_CONFIG.MagazineSize
+local currentAmmo = RIFLE_CONFIG.MagazineSize
 local isReloading = false
+local isFiring = false
 local recoilAmount = 0
+local lastLocalFireTime = -RIFLE_CONFIG.FireCooldown
 
-print("[WeaponClient] Loaded")
+print("[AssaultRifleClient] Loaded")
 
 RunService.RenderStepped:Connect(function(deltaTime)
 	if recoilAmount <= 0 then
@@ -61,7 +59,7 @@ local function playTemporarySound(tool, soundId, volume)
 	local sound = Instance.new("Sound")
 	sound.SoundId = soundId
 	sound.Volume = volume
-	sound.RollOffMaxDistance = 80
+	sound.RollOffMaxDistance = 120
 	sound.Parent = getSoundParent(tool)
 	sound:Play()
 
@@ -86,9 +84,9 @@ local function showMuzzleFlash(tool)
 	if not flash then
 		flash = Instance.new("PointLight")
 		flash.Name = "MuzzleFlash"
-		flash.Brightness = 7
-		flash.Range = 8
-		flash.Color = Color3.fromRGB(255, 235, 170)
+		flash.Brightness = 8
+		flash.Range = 10
+		flash.Color = Color3.fromRGB(255, 232, 160)
 		flash.Enabled = false
 		flash.Parent = barrel
 	end
@@ -98,7 +96,7 @@ local function showMuzzleFlash(tool)
 		flashPart = Instance.new("Part")
 		flashPart.Name = "MuzzleFlashPart"
 		flashPart.Shape = Enum.PartType.Ball
-		flashPart.Size = Vector3.new(0.22, 0.22, 0.22)
+		flashPart.Size = Vector3.new(0.2, 0.2, 0.2)
 		flashPart.Material = Enum.Material.Neon
 		flashPart.Color = Color3.fromRGB(255, 220, 120)
 		flashPart.Transparency = 1
@@ -115,7 +113,6 @@ local function showMuzzleFlash(tool)
 		weld.Parent = flashPart
 	end
 
-	print("[WeaponClient] Muzzle flash")
 	flash.Enabled = true
 	flashPart.Transparency = 0
 
@@ -130,164 +127,186 @@ local function showMuzzleFlash(tool)
 	end)
 end
 
-local function applyRecoil()
-	local recoilMultiplier = 1
-	if ADSController:IsADS() then
-		recoilMultiplier = ADS_RECOIL_MULTIPLIER
-	end
-
-	recoilAmount += RECOIL_KICK * recoilMultiplier
-	print("[WeaponClient] Recoil applied")
-end
-
-local function applySpread(targetPosition)
-	local camera = workspace.CurrentCamera
-	if not camera then
-		return targetPosition
-	end
-
-	local spreadDegrees = PISTOL_CONFIG.HipFireSpread or 0
-	if ADSController:IsADS() then
-		spreadDegrees = PISTOL_CONFIG.ADSSpread or spreadDegrees
-	end
-
-	if spreadDegrees <= 0 then
-		return targetPosition
-	end
-
-	local origin = camera.CFrame.Position
-	local aimDirection = targetPosition - origin
-	if aimDirection.Magnitude <= 0 then
-		return targetPosition
-	end
-
-	local yaw = math.rad((math.random() * 2 - 1) * spreadDegrees)
-	local pitch = math.rad((math.random() * 2 - 1) * spreadDegrees)
-	local spreadCFrame = CFrame.lookAt(Vector3.zero, aimDirection.Unit) * CFrame.Angles(pitch, yaw, 0)
-	local spreadDirection = spreadCFrame.LookVector
-
-	return origin + spreadDirection * aimDirection.Magnitude
-end
-
 local function updateAmmoState()
-	player:SetAttribute("PistolAmmo", currentAmmo)
-	player:SetAttribute("PistolMaxAmmo", PISTOL_CONFIG.MagazineSize)
-	player:SetAttribute("PistolReloading", isReloading)
+	player:SetAttribute("AssaultRifleAmmo", currentAmmo)
+	player:SetAttribute("AssaultRifleMaxAmmo", RIFLE_CONFIG.MagazineSize)
+	player:SetAttribute("AssaultRifleReloading", isReloading)
 
 	if equippedTool then
 		player:SetAttribute("EquippedWeaponName", WEAPON_NAME)
 		player:SetAttribute("EquippedWeaponAmmo", currentAmmo)
-		player:SetAttribute("EquippedWeaponMaxAmmo", PISTOL_CONFIG.MagazineSize)
+		player:SetAttribute("EquippedWeaponMaxAmmo", RIFLE_CONFIG.MagazineSize)
 		player:SetAttribute("EquippedWeaponReloading", isReloading)
 	end
 
-	print("[WeaponClient] Ammo", currentAmmo .. " / " .. PISTOL_CONFIG.MagazineSize)
+	print("[AssaultRifleClient] Ammo", currentAmmo .. " / " .. RIFLE_CONFIG.MagazineSize)
 end
 
-local function reloadPistol()
-	if isReloading or currentAmmo == PISTOL_CONFIG.MagazineSize then
+local function applyRecoil()
+	local recoilMultiplier = 1
+	if ADSController:IsADS() then
+		recoilMultiplier = RIFLE_CONFIG.ADSRecoilMultiplier
+	end
+
+	recoilAmount += RIFLE_CONFIG.Recoil * recoilMultiplier
+end
+
+local function getSpreadTarget()
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return nil
+	end
+
+	local spreadDegrees = RIFLE_CONFIG.HipFireSpread
+	if ADSController:IsADS() then
+		spreadDegrees = RIFLE_CONFIG.ADSSpread
+	end
+
+	local yaw = math.rad((math.random() * 2 - 1) * spreadDegrees)
+	local pitch = math.rad((math.random() * 2 - 1) * spreadDegrees)
+	local spreadCFrame = camera.CFrame * CFrame.Angles(pitch, yaw, 0)
+
+	return camera.CFrame.Position + spreadCFrame.LookVector * RIFLE_CONFIG.Range
+end
+
+local function canFire()
+	if not equippedTool or isReloading or currentAmmo <= 0 then
+		return false
+	end
+
+	if os.clock() - lastLocalFireTime < RIFLE_CONFIG.FireCooldown then
+		return false
+	end
+
+	return true
+end
+
+local function fireOnce()
+	if not canFire() then
+		if equippedTool and currentAmmo <= 0 then
+			playTemporarySound(equippedTool, EMPTY_SOUND_ID, 0.4)
+		end
+
 		return
 	end
 
-	isReloading = true
-	updateAmmoState()
-	print("[WeaponClient] Reload started")
-	playTemporarySound(equippedTool, RELOAD_SOUND_ID, 0.55)
+	local targetPosition = getSpreadTarget()
+	if not targetPosition then
+		return
+	end
 
-	task.delay(PISTOL_CONFIG.ReloadTime, function()
-		currentAmmo = PISTOL_CONFIG.MagazineSize
-		isReloading = false
-		updateAmmoState()
-		print("[WeaponClient] Reload complete")
+	lastLocalFireTime = os.clock()
+	currentAmmo -= 1
+	updateAmmoState()
+	showMuzzleFlash(equippedTool)
+	playTemporarySound(equippedTool, FIRE_SOUND_ID, 0.58)
+	applyRecoil()
+
+	print("[AssaultRifleClient] Fire request sent")
+	WeaponFire:FireServer(WEAPON_NAME, targetPosition)
+end
+
+local function startAutomaticFire()
+	if isFiring then
+		return
+	end
+
+	isFiring = true
+
+	task.spawn(function()
+		while isFiring and equippedTool do
+			fireOnce()
+			task.wait(RIFLE_CONFIG.FireCooldown)
+		end
 	end)
 end
 
-local function connectPistol(tool)
+local function stopAutomaticFire()
+	isFiring = false
+end
+
+local function reloadRifle()
+	if isReloading or currentAmmo == RIFLE_CONFIG.MagazineSize or not equippedTool then
+		return
+	end
+
+	stopAutomaticFire()
+	isReloading = true
+	updateAmmoState()
+	print("[AssaultRifleClient] Reload started")
+	playTemporarySound(equippedTool, RELOAD_SOUND_ID, 0.55)
+
+	task.delay(RIFLE_CONFIG.ReloadTime, function()
+		currentAmmo = RIFLE_CONFIG.MagazineSize
+		isReloading = false
+		updateAmmoState()
+		print("[AssaultRifleClient] Reload complete")
+	end)
+end
+
+local function connectRifle(tool)
 	if not tool:IsA("Tool") or tool.Name ~= WEAPON_NAME or connectedTools[tool] then
 		return
 	end
 
 	connectedTools[tool] = true
-	print("[WeaponClient] Pistol found")
+	print("[AssaultRifleClient] AssaultRifle found")
 
 	tool.Equipped:Connect(function()
 		equippedTool = tool
 		ADSController:SetWeaponEquipped(true)
 		updateAmmoState()
-		print("[WeaponClient] Equipped")
+		print("[AssaultRifleClient] Equipped")
 	end)
 
 	tool.Unequipped:Connect(function()
 		if equippedTool == tool then
+			stopAutomaticFire()
 			equippedTool = nil
+			isReloading = false
 			ADSController:SetWeaponEquipped(false)
 			player:SetAttribute("EquippedWeaponReloading", false)
+			print("[AssaultRifleClient] Unequipped")
 		end
 	end)
-
-	tool.Activated:Connect(function()
-		print("[WeaponClient] Activated")
-
-		if equippedTool ~= tool or isReloading or not mouse.Hit then
-			return
-		end
-
-		if currentAmmo <= 0 then
-			print("[WeaponClient] Empty magazine")
-			playTemporarySound(tool, EMPTY_SOUND_ID, 0.45)
-			return
-		end
-
-		currentAmmo -= 1
-		updateAmmoState()
-		showMuzzleFlash(tool)
-		playTemporarySound(tool, FIRE_SOUND_ID, 0.75)
-		print("[WeaponClient] Fire sound")
-		applyRecoil()
-
-		-- Send only the aimed position. The server chooses the origin, range, hit, and damage.
-		print("[WeaponClient] Fire request sent")
-		WeaponFire:FireServer(WEAPON_NAME, applySpread(mouse.Hit.Position))
-	end)
-end
-
-local function findPistol(backpack, character)
-	local backpackTool = backpack:FindFirstChild(WEAPON_NAME)
-	if backpackTool then
-		connectPistol(backpackTool)
-	end
-
-	local characterTool = character:FindFirstChild(WEAPON_NAME)
-	if characterTool then
-		connectPistol(characterTool)
-	end
 end
 
 local function watchContainer(container)
 	for _, child in ipairs(container:GetChildren()) do
-		connectPistol(child)
+		connectRifle(child)
 	end
 
-	container.ChildAdded:Connect(connectPistol)
+	container.ChildAdded:Connect(connectRifle)
 end
 
 local backpack = player:WaitForChild("Backpack")
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed or input.KeyCode ~= Enum.KeyCode.R or not equippedTool then
+	if gameProcessed then
 		return
 	end
 
-	reloadPistol()
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		startAutomaticFire()
+	elseif input.KeyCode == Enum.KeyCode.R then
+		reloadRifle()
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		stopAutomaticFire()
+	end
 end)
 
 local function setupCharacter(character)
+	stopAutomaticFire()
 	equippedTool = nil
+	isReloading = false
 	ADSController:SetWeaponEquipped(false)
 
 	watchContainer(backpack)
 	watchContainer(character)
-	findPistol(backpack, character)
 end
 
 local character = player.Character or player.CharacterAdded:Wait()

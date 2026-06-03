@@ -11,6 +11,20 @@ local WeaponConfig = {
 		HipFireSpread = 1.5,
 		ADSSpread = 0.5,
 	},
+
+	AssaultRifle = {
+		Damage = 16,
+		HeadshotMultiplier = 1.8,
+		Range = 450,
+		FireCooldown = 0.09,
+		MagazineSize = 30,
+		ReloadTime = 1.8,
+		HipFireSpread = 2.2,
+		ADSSpread = 0.9,
+		Recoil = 1.2,
+		ADSRecoilMultiplier = 0.65,
+		Automatic = true,
+	},
 }
 
 return WeaponConfig

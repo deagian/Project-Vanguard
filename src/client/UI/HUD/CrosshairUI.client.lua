@@ -1,11 +1,14 @@
--- CrosshairUI creates a simple center-screen ScreenGui crosshair for the Pistol.
+-- CrosshairUI creates a simple center-screen ScreenGui crosshair for supported weapons.
 -- It only handles UI visibility and does not change weapon firing logic.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
-local WEAPON_NAME = "Pistol"
+local SUPPORTED_WEAPONS = {
+	Pistol = true,
+	AssaultRifle = true,
+}
 
 local CROSSHAIR_TWEEN_INFO = TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 local NORMAL_CROSSHAIR_SIZE = UDim2.fromOffset(42, 42)
@@ -133,9 +136,9 @@ local function setCrosshairVisible(isVisible)
 	end
 end
 
--- Pistol equip tracking
-local function connectPistol(tool)
-	if not tool:IsA("Tool") or tool.Name ~= WEAPON_NAME or connectedTools[tool] then
+-- Supported weapon equip tracking
+local function connectWeapon(tool)
+	if not tool:IsA("Tool") or not SUPPORTED_WEAPONS[tool.Name] or connectedTools[tool] then
 		return
 	end
 
@@ -158,10 +161,10 @@ local function watchContainer(container)
 	watchedContainers[container] = true
 
 	for _, child in ipairs(container:GetChildren()) do
-		connectPistol(child)
+		connectWeapon(child)
 	end
 
-	container.ChildAdded:Connect(connectPistol)
+	container.ChildAdded:Connect(connectWeapon)
 end
 
 local function setupCharacter(character)

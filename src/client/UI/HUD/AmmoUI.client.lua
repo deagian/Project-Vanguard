@@ -1,5 +1,5 @@
--- AmmoUI displays the local pistol ammo count near the bottom right.
--- It reads client-side player attributes updated by PistolClient and does not affect weapon damage.
+-- AmmoUI displays the local equipped weapon ammo count near the bottom right.
+-- It reads client-side player attributes updated by weapon clients and does not affect weapon damage.
 
 local Players = game:GetService("Players")
 
@@ -18,7 +18,7 @@ local ammoLabel = Instance.new("TextLabel")
 ammoLabel.Name = "AmmoLabel"
 ammoLabel.AnchorPoint = Vector2.new(1, 1)
 ammoLabel.Position = UDim2.new(1, -34, 1, -34)
-ammoLabel.Size = UDim2.fromOffset(150, 42)
+ammoLabel.Size = UDim2.fromOffset(240, 42)
 ammoLabel.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
 ammoLabel.BackgroundTransparency = 0.22
 ammoLabel.BorderSizePixel = 0
@@ -40,19 +40,24 @@ stroke.Thickness = 1
 stroke.Parent = ammoLabel
 
 local function updateAmmoText()
-	local currentAmmo = player:GetAttribute("PistolAmmo") or 0
-	local maxAmmo = player:GetAttribute("PistolMaxAmmo") or 12
-	local isReloading = player:GetAttribute("PistolReloading")
+	local weaponName = player:GetAttribute("EquippedWeaponName") or "Pistol"
+	local currentAmmo = player:GetAttribute("EquippedWeaponAmmo") or player:GetAttribute("PistolAmmo") or 0
+	local maxAmmo = player:GetAttribute("EquippedWeaponMaxAmmo") or player:GetAttribute("PistolMaxAmmo") or 12
+	local isReloading = player:GetAttribute("EquippedWeaponReloading")
 
 	if isReloading then
-		ammoLabel.Text = "RELOAD"
+		ammoLabel.Text = weaponName .. " RELOAD"
 	else
-		ammoLabel.Text = currentAmmo .. " / " .. maxAmmo
+		ammoLabel.Text = weaponName .. " " .. currentAmmo .. " / " .. maxAmmo
 	end
 end
 
 player:GetAttributeChangedSignal("PistolAmmo"):Connect(updateAmmoText)
 player:GetAttributeChangedSignal("PistolMaxAmmo"):Connect(updateAmmoText)
 player:GetAttributeChangedSignal("PistolReloading"):Connect(updateAmmoText)
+player:GetAttributeChangedSignal("EquippedWeaponName"):Connect(updateAmmoText)
+player:GetAttributeChangedSignal("EquippedWeaponAmmo"):Connect(updateAmmoText)
+player:GetAttributeChangedSignal("EquippedWeaponMaxAmmo"):Connect(updateAmmoText)
+player:GetAttributeChangedSignal("EquippedWeaponReloading"):Connect(updateAmmoText)
 
 updateAmmoText()

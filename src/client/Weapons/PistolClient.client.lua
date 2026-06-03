@@ -15,6 +15,7 @@ local Remotes = Shared:WaitForChild("Remotes")
 local WeaponConfig = require(Modules:WaitForChild("WeaponConfig"))
 local WeaponFire = Remotes:WaitForChild("WeaponFire")
 local ADSController = require(script.Parent:WaitForChild("ADSController"))
+local WeaponEffects = require(script.Parent:WaitForChild("WeaponEffects"))
 
 local WEAPON_NAME = "Pistol"
 local PISTOL_CONFIG = WeaponConfig[WEAPON_NAME]
@@ -140,10 +141,10 @@ local function applyRecoil()
 	print("[WeaponClient] Recoil applied")
 end
 
-local function applySpread(targetPosition)
+local function getSpreadShot()
 	local camera = workspace.CurrentCamera
-	if not camera then
-		return targetPosition
+	if not camera or not mouse.Hit then
+		return nil, nil
 	end
 
 	local spreadDegrees = PISTOL_CONFIG.HipFireSpread or 0
@@ -151,22 +152,25 @@ local function applySpread(targetPosition)
 		spreadDegrees = PISTOL_CONFIG.ADSSpread or spreadDegrees
 	end
 
-	if spreadDegrees <= 0 then
-		return targetPosition
-	end
+	local aimPoint = mouse.Hit.Position
+	print("[PistolClient] aimPoint=", aimPoint)
 
 	local origin = camera.CFrame.Position
-	local aimDirection = targetPosition - origin
+	local aimDirection = aimPoint - origin
 	if aimDirection.Magnitude <= 0 then
-		return targetPosition
+		return nil, nil
+	end
+
+	if spreadDegrees <= 0 then
+		return origin, aimDirection.Unit
 	end
 
 	local yaw = math.rad((math.random() * 2 - 1) * spreadDegrees)
 	local pitch = math.rad((math.random() * 2 - 1) * spreadDegrees)
-	local spreadCFrame = CFrame.lookAt(Vector3.zero, aimDirection.Unit) * CFrame.Angles(pitch, yaw, 0)
+	local spreadCFrame = CFrame.lookAt(origin, aimPoint) * CFrame.Angles(pitch, yaw, 0)
 	local spreadDirection = spreadCFrame.LookVector
 
-	return origin + spreadDirection * aimDirection.Magnitude
+	return origin, spreadDirection.Unit, aimPoint
 end
 
 local function updateAmmoState()
@@ -228,7 +232,7 @@ local function connectPistol(tool)
 	tool.Activated:Connect(function()
 		print("[WeaponClient] Activated")
 
-		if equippedTool ~= tool or isReloading or not mouse.Hit then
+		if equippedTool ~= tool or isReloading then
 			return
 		end
 
@@ -240,14 +244,20 @@ local function connectPistol(tool)
 
 		currentAmmo -= 1
 		updateAmmoState()
-		showMuzzleFlash(tool)
-		playTemporarySound(tool, FIRE_SOUND_ID, 0.75)
+		WeaponEffects.PlayMuzzleFlash(tool)
+		WeaponEffects.PlayFireSound(tool, WEAPON_NAME)
 		print("[WeaponClient] Fire sound")
 		applyRecoil()
 
 		-- Send only the aimed position. The server chooses the origin, range, hit, and damage.
 		print("[WeaponClient] Fire request sent")
-		WeaponFire:FireServer(WEAPON_NAME, applySpread(mouse.Hit.Position))
+		local shotOrigin, shotDirection, aimPoint = getSpreadShot()
+		if shotOrigin and shotDirection then
+			local muzzlePosition = WeaponEffects.GetMuzzleWorldPosition(tool) or shotOrigin
+			local tracerDirection = aimPoint - muzzlePosition
+			WeaponEffects.PlayBulletTracer(muzzlePosition, tracerDirection, PISTOL_CONFIG.Range)
+			WeaponFire:FireServer(WEAPON_NAME, shotOrigin, shotDirection, aimPoint)
+		end
 	end)
 end
 

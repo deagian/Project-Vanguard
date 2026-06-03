@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
+local mouse = player:GetMouse()
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Modules = Shared:WaitForChild("Modules")
@@ -14,6 +15,7 @@ local Remotes = Shared:WaitForChild("Remotes")
 local WeaponConfig = require(Modules:WaitForChild("WeaponConfig"))
 local WeaponFire = Remotes:WaitForChild("WeaponFire")
 local ADSController = require(script.Parent:WaitForChild("ADSController"))
+local WeaponEffects = require(script.Parent:WaitForChild("WeaponEffects"))
 
 local WEAPON_NAME = "AssaultRifle"
 local RIFLE_CONFIG = WeaponConfig[WEAPON_NAME]
@@ -151,9 +153,9 @@ local function applyRecoil()
 	recoilAmount += RIFLE_CONFIG.Recoil * recoilMultiplier
 end
 
-local function getSpreadTarget()
+local function getSpreadShot()
 	local camera = workspace.CurrentCamera
-	if not camera then
+	if not camera or not mouse.Hit then
 		return nil
 	end
 
@@ -164,9 +166,18 @@ local function getSpreadTarget()
 
 	local yaw = math.rad((math.random() * 2 - 1) * spreadDegrees)
 	local pitch = math.rad((math.random() * 2 - 1) * spreadDegrees)
-	local spreadCFrame = camera.CFrame * CFrame.Angles(pitch, yaw, 0)
+	local aimPoint = mouse.Hit.Position
+	print("[AssaultRifleClient] aimPoint=", aimPoint)
 
-	return camera.CFrame.Position + spreadCFrame.LookVector * RIFLE_CONFIG.Range
+	local shotOrigin = camera.CFrame.Position
+	local shotDirection = aimPoint - shotOrigin
+	if shotDirection.Magnitude <= 0 then
+		return nil
+	end
+
+	local spreadCFrame = CFrame.lookAt(shotOrigin, aimPoint) * CFrame.Angles(pitch, yaw, 0)
+
+	return shotOrigin, spreadCFrame.LookVector.Unit, aimPoint
 end
 
 local function canFire()
@@ -190,20 +201,24 @@ local function fireOnce()
 		return
 	end
 
-	local targetPosition = getSpreadTarget()
-	if not targetPosition then
+	local shotOrigin, shotDirection, aimPoint = getSpreadShot()
+	if not shotOrigin or not shotDirection then
 		return
 	end
 
 	lastLocalFireTime = os.clock()
 	currentAmmo -= 1
 	updateAmmoState()
-	showMuzzleFlash(equippedTool)
-	playTemporarySound(equippedTool, FIRE_SOUND_ID, 0.58)
+	WeaponEffects.PlayMuzzleFlash(equippedTool)
+	WeaponEffects.PlayFireSound(equippedTool, WEAPON_NAME)
+	local muzzlePosition = WeaponEffects.GetMuzzleWorldPosition(equippedTool) or shotOrigin
+	local tracerDirection = aimPoint - muzzlePosition
+	WeaponEffects.PlayBulletTracer(muzzlePosition, tracerDirection, RIFLE_CONFIG.Range)
 	applyRecoil()
 
 	print("[AssaultRifleClient] Fire request sent")
-	WeaponFire:FireServer(WEAPON_NAME, targetPosition)
+	print("[ARClient] FireServer weapon=AssaultRifle origin=", shotOrigin, " direction=", shotDirection, " ammo=", currentAmmo)
+	WeaponFire:FireServer(WEAPON_NAME, shotOrigin, shotDirection, aimPoint)
 end
 
 local function startAutomaticFire()

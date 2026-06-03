@@ -1,14 +1,16 @@
--- EnemySpawner crea bot rossi temporanei per testare combattimento e AI.
--- TODO: sostituire il placeholder con un modello nemico professionale.
+-- EnemySpawner crea e gestisce i bot per le wave.
+-- Il WaveManager decide quanti nemici spawnare e quando passare alla wave successiva.
 
 local Players = game:GetService("Players")
 
 local EnemyConfig = require(script.Parent:WaitForChild("EnemyConfig"))
 local EnemyAI = require(script.Parent:WaitForChild("EnemyAI"))
 
+local EnemySpawner = {}
+
 local ENEMY_FOLDER_NAME = "Enemies"
 local ENEMY_NAME = "EnemyBot"
-local ENEMY_SPAWNS = {
+local FALLBACK_ENEMY_SPAWNS = {
 	CFrame.new(-24, 4, -28),
 	CFrame.new(24, 4, -30),
 	CFrame.new(0, 4, -50),
@@ -16,24 +18,24 @@ local ENEMY_SPAWNS = {
 
 local enemySettings = EnemyConfig.Enemy
 
-local existingFolder = workspace:FindFirstChild(ENEMY_FOLDER_NAME)
-if existingFolder then
-	existingFolder:Destroy()
+local enemyFolder = workspace:FindFirstChild(ENEMY_FOLDER_NAME)
+if enemyFolder then
+	enemyFolder:Destroy()
 end
 
-local enemyFolder = Instance.new("Folder")
+enemyFolder = Instance.new("Folder")
 enemyFolder.Name = ENEMY_FOLDER_NAME
 enemyFolder.Parent = workspace
 
 local function getMapEnemySpawns()
 	local map = workspace:WaitForChild("Map", 10)
 	if not map then
-		return ENEMY_SPAWNS
+		return FALLBACK_ENEMY_SPAWNS
 	end
 
 	local spawnsFolder = map:WaitForChild("Spawns", 5)
 	if not spawnsFolder then
-		return ENEMY_SPAWNS
+		return FALLBACK_ENEMY_SPAWNS
 	end
 
 	local spawnCFrames = {}
@@ -45,7 +47,7 @@ local function getMapEnemySpawns()
 	end
 
 	if #spawnCFrames == 0 then
-		return ENEMY_SPAWNS
+		return FALLBACK_ENEMY_SPAWNS
 	end
 
 	return spawnCFrames
@@ -124,29 +126,43 @@ local function createEnemyRig(spawnCFrame)
 	return enemy
 end
 
-local function spawnEnemy(spawnCFrame)
+local function spawnEnemy(spawnCFrame, onEnemyDied)
 	local enemy = createEnemyRig(spawnCFrame)
 	EnemyAI.Start(enemy, enemySettings, spawnCFrame.Position)
 
 	local humanoid = enemy:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.Died:Connect(function()
-			task.delay(enemySettings.RespawnTime, function()
-				if enemy.Parent then
-					enemy:Destroy()
-				end
+			local lastDamagedBy = humanoid:FindFirstChild("LastDamagedBy")
+			local killer = if lastDamagedBy and lastDamagedBy:IsA("ObjectValue") then lastDamagedBy.Value else nil
 
-				spawnEnemy(spawnCFrame)
-				print("[EnemySpawner] Enemy respawned")
-			end)
+			if onEnemyDied then
+				onEnemyDied(enemy, killer)
+			end
 		end)
 	end
 
 	return enemy
 end
 
-for _, spawnCFrame in ipairs(getMapEnemySpawns()) do
-	spawnEnemy(spawnCFrame)
+function EnemySpawner.ClearEnemies()
+	for _, enemy in ipairs(enemyFolder:GetChildren()) do
+		enemy:Destroy()
+	end
 end
 
-print("[EnemySpawner] Enemy system loaded")
+function EnemySpawner.SpawnWave(enemyCount, onEnemyDied)
+	EnemySpawner.ClearEnemies()
+
+	local spawnCFrames = getMapEnemySpawns()
+	local spawnedEnemies = {}
+
+	for index = 1, enemyCount do
+		local spawnCFrame = spawnCFrames[((index - 1) % #spawnCFrames) + 1]
+		table.insert(spawnedEnemies, spawnEnemy(spawnCFrame, onEnemyDied))
+	end
+
+	return spawnedEnemies
+end
+
+return EnemySpawner

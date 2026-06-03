@@ -69,6 +69,21 @@ local function findHumanoidFromHit(hitInstance)
 	return nil
 end
 
+local function tagEnemyKillCredit(humanoid, player)
+	if not humanoid.Parent or humanoid.Parent.Name ~= "EnemyBot" then
+		return
+	end
+
+	local lastDamagedBy = humanoid:FindFirstChild("LastDamagedBy")
+	if not lastDamagedBy then
+		lastDamagedBy = Instance.new("ObjectValue")
+		lastDamagedBy.Name = "LastDamagedBy"
+		lastDamagedBy.Parent = humanoid
+	end
+
+	lastDamagedBy.Value = player
+end
+
 local function canFire(player, weaponName, cooldown)
 	local playerCooldowns = lastFireTimes[player]
 	if not playerCooldowns then
@@ -268,6 +283,7 @@ local function onWeaponFire(player, weaponName, shotOriginOrTarget, shotDirectio
 	end
 
 	-- Damage is always chosen by the server, never by the client request.
+	tagEnemyKillCredit(humanoid, player)
 	humanoid:TakeDamage(damage)
 	print("[WeaponServer] Damage applied", healthBefore, "->", humanoid.Health)
 	if weaponName == "AssaultRifle" then

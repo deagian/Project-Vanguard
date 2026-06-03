@@ -2,6 +2,7 @@
 -- Il danno al player viene applicato solo dal server.
 
 local Players = game:GetService("Players")
+local Debris = game:GetService("Debris")
 
 local EnemyAI = {}
 
@@ -17,21 +18,23 @@ local function getAliveCharacterParts(player)
 		return nil, nil
 	end
 
-	return humanoid, rootPart
+	return character, humanoid, rootPart
 end
 
 local function getNearestPlayer(enemyRootPart, detectionRange)
 	local nearestPlayer = nil
+	local nearestCharacter = nil
 	local nearestHumanoid = nil
 	local nearestRootPart = nil
 	local nearestDistance = detectionRange
 
 	for _, player in ipairs(Players:GetPlayers()) do
-		local humanoid, rootPart = getAliveCharacterParts(player)
+		local character, humanoid, rootPart = getAliveCharacterParts(player)
 		if humanoid and rootPart then
 			local distance = (rootPart.Position - enemyRootPart.Position).Magnitude
 			if distance <= nearestDistance then
 				nearestPlayer = player
+				nearestCharacter = character
 				nearestHumanoid = humanoid
 				nearestRootPart = rootPart
 				nearestDistance = distance
@@ -39,7 +42,7 @@ local function getNearestPlayer(enemyRootPart, detectionRange)
 		end
 	end
 
-	return nearestPlayer, nearestHumanoid, nearestRootPart, nearestDistance
+	return nearestPlayer, nearestCharacter, nearestHumanoid, nearestRootPart, nearestDistance
 end
 
 local function faceTarget(enemyRootPart, targetPosition)
@@ -60,6 +63,105 @@ local function getPatrolPoint(homePosition, radius)
 	local offset = Vector3.new(math.cos(angle) * distance, 0, math.sin(angle) * distance)
 
 	return homePosition + offset
+end
+
+local function getAimPart(model)
+	return model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart")
+end
+
+local function hasLineOfSight(enemyModel, enemyRootPart, targetCharacter)
+	local enemyAimPart = getAimPart(enemyModel) or enemyRootPart
+	local targetAimPart = getAimPart(targetCharacter)
+	if not targetAimPart then
+		return false
+	end
+
+	local origin = enemyAimPart.Position
+	local targetPosition = targetAimPart.Position
+	local direction = targetPosition - origin
+	if direction.Magnitude <= 0 then
+		return false
+	end
+
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+	raycastParams.FilterDescendantsInstances = { enemyModel }
+	raycastParams.IgnoreWater = true
+
+	local result = workspace:Raycast(origin, direction, raycastParams)
+	if result and result.Instance:IsDescendantOf(targetCharacter) then
+		print("[EnemyAI] Line of sight confirmed")
+		return true
+	end
+
+	if result then
+		print("[EnemyAI] Line of sight blocked by " .. result.Instance.Name)
+	else
+		print("[EnemyAI] Line of sight blocked by nil")
+	end
+
+	return false
+end
+
+local function getMuzzlePosition(enemyModel, enemyRootPart)
+	local attachment = enemyModel:FindFirstChild("EnemyMuzzleAttachment", true)
+	if attachment and attachment:IsA("Attachment") then
+		return attachment.WorldPosition
+	end
+
+	local rifle = enemyModel:FindFirstChild("EnemyRifle", true)
+	if rifle and rifle:IsA("BasePart") then
+		return rifle.Position + rifle.CFrame.LookVector * (rifle.Size.Z * 0.5)
+	end
+
+	return enemyRootPart.Position
+end
+
+local function playMuzzleFlash(enemyModel, enemyRootPart)
+	local muzzlePosition = getMuzzlePosition(enemyModel, enemyRootPart)
+
+	local flash = Instance.new("Part")
+	flash.Name = "EnemyMuzzleFlash"
+	flash.Shape = Enum.PartType.Ball
+	flash.Size = Vector3.new(0.35, 0.35, 0.35)
+	flash.Material = Enum.Material.Neon
+	flash.Color = Color3.fromRGB(255, 190, 60)
+	flash.Anchored = true
+	flash.CanCollide = false
+	flash.CanQuery = false
+	flash.CanTouch = false
+	flash.CFrame = CFrame.new(muzzlePosition)
+	flash.Parent = workspace
+
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 185, 75)
+	light.Brightness = 4
+	light.Range = 8
+	light.Parent = flash
+
+	Debris:AddItem(flash, 0.08)
+end
+
+local function playTracer(enemyModel, enemyRootPart, targetPosition)
+	local muzzlePosition = getMuzzlePosition(enemyModel, enemyRootPart)
+	local direction = targetPosition - muzzlePosition
+	if direction.Magnitude <= 0 then
+		return
+	end
+
+	local tracer = Instance.new("Part")
+	tracer.Name = "EnemyBulletTracer"
+	tracer.Anchored = true
+	tracer.CanCollide = false
+	tracer.CanQuery = false
+	tracer.CanTouch = false
+	tracer.Material = Enum.Material.Neon
+	tracer.Color = Color3.fromRGB(255, 80, 55)
+	tracer.Size = Vector3.new(0.08, 0.08, direction.Magnitude)
+	tracer.CFrame = CFrame.lookAt(muzzlePosition + direction * 0.5, targetPosition)
+	tracer.Parent = workspace
+
+	Debris:AddItem(tracer, 0.08)
 end
 
 function EnemyAI.Start(enemyModel, config, homePosition)
@@ -85,9 +187,10 @@ function EnemyAI.Start(enemyModel, config, homePosition)
 
 	task.spawn(function()
 		while alive and enemyModel.Parent do
-			local targetPlayer, targetHumanoid, targetRootPart, distance = getNearestPlayer(rootPart, config.DetectionRange)
+			local targetPlayer, targetCharacter, targetHumanoid, targetRootPart, distance =
+				getNearestPlayer(rootPart, config.DetectionRange)
 
-			if targetPlayer and targetHumanoid and targetRootPart then
+			if targetPlayer and targetCharacter and targetHumanoid and targetRootPart then
 				if currentTarget ~= targetPlayer then
 					currentTarget = targetPlayer
 					print("[EnemyAI] Enemy detected player")
@@ -103,9 +206,15 @@ function EnemyAI.Start(enemyModel, config, homePosition)
 					local now = os.clock()
 					if now - lastAttackTime >= config.FireCooldown then
 						lastAttackTime = now
-						print("[EnemyAI] Enemy attacking player")
-						targetHumanoid:TakeDamage(config.Damage)
-						print("[EnemyAI] Player damaged amount=" .. tostring(config.Damage))
+
+						if targetHumanoid.Health > 0 and humanoid.Health > 0 and hasLineOfSight(enemyModel, rootPart, targetCharacter) then
+							local targetAimPart = getAimPart(targetCharacter) or targetRootPart
+							print("[EnemyAI] Enemy attacking player")
+							playMuzzleFlash(enemyModel, rootPart)
+							playTracer(enemyModel, rootPart, targetAimPart.Position)
+							targetHumanoid:TakeDamage(config.Damage)
+							print("[EnemyAI] Player damaged amount=" .. tostring(config.Damage))
+						end
 					end
 				end
 			else

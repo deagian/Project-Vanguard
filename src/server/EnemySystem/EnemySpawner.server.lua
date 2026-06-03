@@ -46,6 +46,37 @@ local function tintEnemy(model)
 	end
 end
 
+local function attachEnemyRifle(model)
+	local hand = model:FindFirstChild("Right Arm")
+	local torso = model:FindFirstChild("Torso")
+	local attachPart = hand or torso
+	if not attachPart or not attachPart:IsA("BasePart") then
+		return
+	end
+
+	local rifle = Instance.new("Part")
+	rifle.Name = "EnemyRifle"
+	rifle.Size = Vector3.new(0.22, 0.22, 2.6)
+	rifle.Material = Enum.Material.Metal
+	rifle.Color = Color3.fromRGB(35, 35, 38)
+	rifle.CanCollide = false
+	rifle.CanQuery = false
+	rifle.CanTouch = false
+	rifle.Massless = true
+	rifle.CFrame = attachPart.CFrame * CFrame.new(0, -0.9, -0.75) * CFrame.Angles(math.rad(90), 0, 0)
+	rifle.Parent = model
+
+	local muzzleAttachment = Instance.new("Attachment")
+	muzzleAttachment.Name = "EnemyMuzzleAttachment"
+	muzzleAttachment.Position = Vector3.new(0, 0, -rifle.Size.Z * 0.5)
+	muzzleAttachment.Parent = rifle
+
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = attachPart
+	weld.Part1 = rifle
+	weld.Parent = rifle
+end
+
 local function createEnemyRig(spawnCFrame)
 	local humanoidDescription = Instance.new("HumanoidDescription")
 	local enemy = Players:CreateHumanoidModelFromDescription(humanoidDescription, Enum.HumanoidRigType.R6)
@@ -62,6 +93,7 @@ local function createEnemyRig(spawnCFrame)
 
 	tintEnemy(enemy)
 	enemy:PivotTo(spawnCFrame)
+	attachEnemyRifle(enemy)
 
 	return enemy
 end

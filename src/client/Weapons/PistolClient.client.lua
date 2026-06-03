@@ -20,8 +20,8 @@ local WeaponEffects = require(script.Parent:WaitForChild("WeaponEffects"))
 local WEAPON_NAME = "Pistol"
 local PISTOL_CONFIG = WeaponConfig[WEAPON_NAME]
 local MUZZLE_FLASH_TIME = 0.05
-local RECOIL_KICK = 1.4
-local ADS_RECOIL_MULTIPLIER = 0.65
+local RECOIL_KICK = PISTOL_CONFIG.Recoil or 0.9
+local ADS_RECOIL_MULTIPLIER = PISTOL_CONFIG.ADSRecoilMultiplier or 0.55
 local RECOIL_RETURN_SPEED = 18
 local FIRE_SOUND_ID = "rbxassetid://9119561046"
 -- TODO: Replace with a Project Vanguard-owned public reload sound ID.

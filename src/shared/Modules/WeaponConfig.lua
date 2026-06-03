@@ -10,6 +10,8 @@ local WeaponConfig = {
 		ReloadTime = 1.5,
 		HipFireSpread = 1.5,
 		ADSSpread = 0.5,
+		Recoil = 0.9,
+		ADSRecoilMultiplier = 0.55,
 	},
 
 	AssaultRifle = {
@@ -21,8 +23,8 @@ local WeaponConfig = {
 		ReloadTime = 1.8,
 		HipFireSpread = 2.2,
 		ADSSpread = 0.9,
-		Recoil = 1.2,
-		ADSRecoilMultiplier = 0.65,
+		Recoil = 0.65,
+		ADSRecoilMultiplier = 0.55,
 		Automatic = true,
 	},
 }

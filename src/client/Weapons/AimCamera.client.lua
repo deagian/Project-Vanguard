@@ -5,7 +5,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
-local AIM_SENSITIVITY_MULTIPLIER = 0.55
+local AIM_SENSITIVITY_MULTIPLIER = 0.42
 local CAMERA_SMOOTHNESS = 0.15
 local SHOULDER_OFFSET = Vector3.new(2.2, 1.4, 0)
 

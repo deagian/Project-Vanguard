@@ -4,6 +4,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local ADS_FOV = 55
 local FOV_TWEEN_INFO = TweenInfo.new(0.18, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+local ADS_MOUSE_SENSITIVITY_MULTIPLIER = 0.78
 
 local player = Players.LocalPlayer
 
@@ -12,6 +13,7 @@ local ADSController = {}
 local isEquipped = false
 local isADS = false
 local normalFOV = nil
+local preADSMouseDeltaSensitivity = nil
 local activeFOVTween = nil
 
 local function setADSAttribute()
@@ -47,15 +49,21 @@ local function setADS(enabled)
 	local camera = workspace.CurrentCamera
 	if enabled then
 		normalFOV = camera and camera.FieldOfView or normalFOV
+		preADSMouseDeltaSensitivity = UserInputService.MouseDeltaSensitivity
+		UserInputService.MouseDeltaSensitivity = preADSMouseDeltaSensitivity * ADS_MOUSE_SENSITIVITY_MULTIPLIER
 		isADS = true
 		tweenCameraFOV(ADS_FOV)
 		print("[ADS] Enabled")
 	else
 		isADS = false
+		if preADSMouseDeltaSensitivity then
+			UserInputService.MouseDeltaSensitivity = preADSMouseDeltaSensitivity
+		end
 		if normalFOV then
 			tweenCameraFOV(normalFOV)
 		end
 		normalFOV = nil
+		preADSMouseDeltaSensitivity = nil
 		print("[ADS] Disabled")
 	end
 

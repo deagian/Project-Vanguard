@@ -4,11 +4,11 @@
 local EnemyConfig = {
 	Enemy = {
 		MaxHealth = 100,
-		WalkSpeed = 10,
-		DetectionRange = 80,
-		AttackRange = 55,
-		FireCooldown = 1.2,
-		Damage = 8,
+		WalkSpeed = 8,
+		DetectionRange = 65,
+		AttackRange = 40,
+		FireCooldown = 2.0,
+		Damage = 3,
 		RespawnTime = 4,
 		PatrolRadius = 10,
 		PatrolCooldown = 3,

@@ -105,6 +105,7 @@ function EnemyAI.Start(enemyModel, config, homePosition)
 						lastAttackTime = now
 						print("[EnemyAI] Enemy attacking player")
 						targetHumanoid:TakeDamage(config.Damage)
+						print("[EnemyAI] Player damaged amount=" .. tostring(config.Damage))
 					end
 				end
 			else

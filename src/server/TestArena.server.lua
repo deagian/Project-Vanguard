@@ -2,14 +2,25 @@
 -- Il layout e' pensato per testare movimento, coperture, ADS e line of sight nemica.
 
 local MAP_NAME = "Map"
+local GENERATED_ATTRIBUTE = "ProjectVanguardGenerated"
 
-local existingMap = workspace:FindFirstChild(MAP_NAME)
-if existingMap then
-	existingMap:Destroy()
+local function clearOldGeneratedWorld()
+	for _, child in ipairs(workspace:GetChildren()) do
+		if child.Name == MAP_NAME or child.Name == "TestArena" then
+			child:Destroy()
+		elseif child:IsA("SpawnLocation") and child.Name == "PlayerSpawn" then
+			child:Destroy()
+		end
+	end
+
+	print("[WorldSetup] Cleared old generated folders")
 end
+
+clearOldGeneratedWorld()
 
 local map = Instance.new("Folder")
 map.Name = MAP_NAME
+map:SetAttribute(GENERATED_ATTRIBUTE, true)
 map.Parent = workspace
 
 local streetFolder = Instance.new("Folder")
@@ -49,6 +60,7 @@ end
 local function createPlayerSpawn(name, cframe, color)
 	local spawnLocation = Instance.new("SpawnLocation")
 	spawnLocation.Name = name
+	spawnLocation:SetAttribute(GENERATED_ATTRIBUTE, true)
 	spawnLocation.Size = Vector3.new(6, 1, 6)
 	spawnLocation.CFrame = cframe
 	spawnLocation.Color = color
@@ -167,3 +179,4 @@ createEnemySpawn("EnemySpawn2", CFrame.new(22, 0.2, -52))
 createEnemySpawn("EnemySpawn3", CFrame.new(0, 0.2, -58))
 
 print("[Map] Urban test map loaded")
+print("[WorldSetup] Map initialized once")

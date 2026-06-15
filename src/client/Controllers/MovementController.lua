@@ -1,5 +1,3 @@
-print("[Movement] MovementController loaded")
-
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -12,9 +10,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Modules = Shared:WaitForChild("Modules")
 
 local GameSettings = require(Modules:WaitForChild("GameSettings"))
-print(GameSettings)
-print(GameSettings.StaminaDrainRate)
-print(GameSettings.MaxStamina)
 local InputManager = require(
 	script.Parent.Parent.Input:WaitForChild("InputManager")
 )
@@ -47,12 +42,17 @@ end
 local function setupCharacter(newCharacter)
 	character = newCharacter
 	humanoid = character:WaitForChild("Humanoid")
+	isSprinting = false
+	stamina = GameSettings.MaxStamina
+	bobTime = 0
 	humanoid.WalkSpeed = GameSettings.DefaultWalkSpeed
+	tweenFOV(DEFAULT_FOV)
 end
 
 local function startSprint()
 	if not humanoid then return end
 	if stamina <= 0 then return end
+	if humanoid.MoveDirection.Magnitude <= 0 then return end
 
 	isSprinting = true
 	humanoid.WalkSpeed = GameSettings.SprintSpeed
@@ -94,7 +94,9 @@ end
 local function updateStamina(dt)
 	dt = tonumber(dt) or 0.016
 
-	if isSprinting then
+	local moving = humanoid and humanoid.MoveDirection.Magnitude > 0
+
+	if isSprinting and moving then
 		stamina -= GameSettings.StaminaDrainRate * dt
 
 		if stamina <= 0 then
@@ -114,7 +116,9 @@ RunService.RenderStepped:Connect(function(dt)
 
 	dt = tonumber(dt) or 0.016
 
-	if InputManager:IsSprinting() then
+	local moving = humanoid and humanoid.MoveDirection.Magnitude > 0
+
+	if InputManager:IsSprinting() and moving then
 		if not isSprinting then
 			startSprint()
 		end

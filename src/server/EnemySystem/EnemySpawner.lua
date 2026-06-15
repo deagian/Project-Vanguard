@@ -10,6 +10,7 @@ local EnemySpawner = {}
 
 local ENEMY_FOLDER_NAME = "Enemies"
 local ENEMY_NAME = "EnemyBot"
+local GENERATED_ATTRIBUTE = "ProjectVanguardGenerated"
 local FALLBACK_ENEMY_SPAWNS = {
 	CFrame.new(-24, 4, -28),
 	CFrame.new(24, 4, -30),
@@ -18,13 +19,21 @@ local FALLBACK_ENEMY_SPAWNS = {
 
 local enemySettings = EnemyConfig.Enemy
 
-local enemyFolder = workspace:FindFirstChild(ENEMY_FOLDER_NAME)
-if enemyFolder then
-	enemyFolder:Destroy()
+local function clearOldEnemyFolders()
+	for _, child in ipairs(workspace:GetChildren()) do
+		if child.Name == ENEMY_FOLDER_NAME then
+			child:Destroy()
+		end
+	end
 end
 
-enemyFolder = Instance.new("Folder")
+clearOldEnemyFolders()
+
+print("[EnemySpawner] Enemies folder initialized once")
+
+local enemyFolder = Instance.new("Folder")
 enemyFolder.Name = ENEMY_FOLDER_NAME
+enemyFolder:SetAttribute(GENERATED_ATTRIBUTE, true)
 enemyFolder.Parent = workspace
 
 local function getMapEnemySpawns()

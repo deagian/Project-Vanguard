@@ -13,6 +13,7 @@ print("[MovementServer] MovementAction RemoteEvent confirmed")
 
 local slideConfig = MovementConfig.Slide
 local lastActionTimes = {}
+local crouchStates = {}
 
 local function rejectDodge(reason)
 	print("[MovementServer] Dodge rejected: " .. reason)
@@ -52,6 +53,20 @@ local function onMovementAction(player, actionName, dodgeSide)
 		return
 	end
 
+	if actionName == "CrouchChanged" then
+		crouchStates[player] = dodgeSide == true
+
+		local character = player.Character
+		if character then
+			character:SetAttribute("IsCrouching", crouchStates[player])
+			character:SetAttribute("CanSprint", not crouchStates[player])
+			character:SetAttribute("CanDodge", not crouchStates[player])
+			character:SetAttribute("CanSlide", not crouchStates[player])
+		end
+
+		return
+	end
+
 	if actionName ~= "Dodge" then
 		rejectDodge("invalid action")
 		return
@@ -73,6 +88,11 @@ local function onMovementAction(player, actionName, dodgeSide)
 		return
 	end
 
+	if crouchStates[player] then
+		rejectDodge("crouching")
+		return
+	end
+
 	if not canUseSlide(player) then
 		return
 	end
@@ -86,4 +106,5 @@ MovementAction.OnServerEvent:Connect(onMovementAction)
 
 Players.PlayerRemoving:Connect(function(player)
 	lastActionTimes[player] = nil
+	crouchStates[player] = nil
 end)

@@ -59,6 +59,10 @@ local function canStartSlide()
 		return false
 	end
 
+	if MovementController:IsCrouching() then
+		return false
+	end
+
 	if MovementController:GetStamina() < slideConfig.MinStaminaRequired then
 		return false
 	end

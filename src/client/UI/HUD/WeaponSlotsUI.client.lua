@@ -5,6 +5,7 @@
 -- Slot 2 = AssaultRifle
 -- Press same slot again = unequip weapon
 -- Slots 3/4/5 empty
+-- Weapon names are intentionally not shown in the HUD.
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -25,6 +26,8 @@ local SLOT_WEAPONS = {
 }
 
 local slotButtons = {}
+local slotStrokes = {}
+local slotIcons = {}
 local selectedSlot = nil
 
 -- Rojo / hot-sync safety
@@ -80,6 +83,10 @@ local function findTool(toolName)
 	return nil, nil
 end
 
+local function hasTool(toolName)
+	return findTool(toolName) ~= nil
+end
+
 local function getEquippedTool()
 	local character = player.Character
 	if not character then
@@ -97,12 +104,27 @@ end
 
 local function updateHighlight()
 	for slotNumber, button in pairs(slotButtons) do
+		local stroke = slotStrokes[slotNumber]
+		local icon = slotIcons[slotNumber]
+		local weaponName = SLOT_WEAPONS[slotNumber]
+		local isAvailable = weaponName ~= nil and hasTool(weaponName)
+
 		if slotNumber == selectedSlot then
-			button.BackgroundColor3 = Color3.fromRGB(70, 130, 255)
-			button.BorderSizePixel = 3
+			button.BackgroundColor3 = Color3.fromRGB(42, 82, 150)
+			if stroke then
+				stroke.Color = Color3.fromRGB(115, 170, 255)
+				stroke.Thickness = 3
+			end
 		else
-			button.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-			button.BorderSizePixel = 1
+			button.BackgroundColor3 = if isAvailable then Color3.fromRGB(26, 28, 34) else Color3.fromRGB(18, 18, 20)
+			if stroke then
+				stroke.Color = if isAvailable then Color3.fromRGB(92, 98, 112) else Color3.fromRGB(52, 54, 60)
+				stroke.Thickness = 1
+			end
+		end
+
+		if icon then
+			icon.GroupTransparency = if isAvailable then 0 else 0.55
 		end
 	end
 end
@@ -164,6 +186,58 @@ local function equipSlot(slotNumber)
 	updateHighlight()
 end
 
+local function createCorner(parent, radius)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius)
+	corner.Parent = parent
+	return corner
+end
+
+local function createIconPart(parent, name, position, size, rotation, color)
+	local part = Instance.new("Frame")
+	part.Name = name
+	part.AnchorPoint = Vector2.new(0.5, 0.5)
+	part.Position = position
+	part.Size = size
+	part.Rotation = rotation or 0
+	part.BackgroundColor3 = color
+	part.BorderSizePixel = 0
+	part.Parent = parent
+	createCorner(part, 2)
+	return part
+end
+
+local function createWeaponIcon(parent, weaponName)
+	local icon = Instance.new("CanvasGroup")
+	icon.Name = "WeaponIcon"
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.55)
+	icon.Size = UDim2.fromOffset(42, 30)
+	icon.BackgroundTransparency = 1
+	icon.Parent = parent
+
+	local color = Color3.fromRGB(232, 236, 244)
+	local accent = Color3.fromRGB(158, 174, 202)
+
+	if weaponName == "Pistol" then
+		createIconPart(icon, "Slide", UDim2.fromScale(0.48, 0.33), UDim2.fromOffset(28, 7), 0, color)
+		createIconPart(icon, "Barrel", UDim2.fromScale(0.76, 0.31), UDim2.fromOffset(12, 4), 0, color)
+		createIconPart(icon, "Body", UDim2.fromScale(0.43, 0.52), UDim2.fromOffset(21, 8), 0, color)
+		createIconPart(icon, "Grip", UDim2.fromScale(0.34, 0.73), UDim2.fromOffset(9, 18), -18, accent)
+		createIconPart(icon, "TriggerGuard", UDim2.fromScale(0.52, 0.68), UDim2.fromOffset(8, 4), 0, accent)
+	elseif weaponName == "AssaultRifle" then
+		createIconPart(icon, "Receiver", UDim2.fromScale(0.48, 0.42), UDim2.fromOffset(28, 8), 0, color)
+		createIconPart(icon, "Barrel", UDim2.fromScale(0.79, 0.39), UDim2.fromOffset(21, 4), 0, color)
+		createIconPart(icon, "Stock", UDim2.fromScale(0.14, 0.47), UDim2.fromOffset(16, 8), -18, accent)
+		createIconPart(icon, "Grip", UDim2.fromScale(0.43, 0.69), UDim2.fromOffset(7, 16), 16, accent)
+		createIconPart(icon, "Magazine", UDim2.fromScale(0.58, 0.72), UDim2.fromOffset(8, 17), -9, accent)
+	else
+		createIconPart(icon, "EmptyLine", UDim2.fromScale(0.5, 0.5), UDim2.fromOffset(24, 3), 0, Color3.fromRGB(98, 102, 112))
+	end
+
+	return icon
+end
+
 local function createUI()
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = GUI_NAME
@@ -191,21 +265,34 @@ local function createUI()
 		button.Name = "Slot" .. i
 		button.Size = UDim2.new(0, 62, 0, 62)
 		button.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-		button.BorderColor3 = Color3.fromRGB(255, 255, 255)
-		button.BorderSizePixel = 1
+		button.BorderSizePixel = 0
 		button.AutoButtonColor = true
-		button.TextColor3 = Color3.fromRGB(255, 255, 255)
-		button.TextScaled = true
-		button.Font = Enum.Font.GothamBold
+		button.Text = ""
 		button.Parent = root
+		createCorner(button, 6)
+
+		local stroke = Instance.new("UIStroke")
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Color = Color3.fromRGB(92, 98, 112)
+		stroke.Thickness = 1
+		stroke.Parent = button
+		slotStrokes[i] = stroke
+
+		local keyLabel = Instance.new("TextLabel")
+		keyLabel.Name = "KeyNumber"
+		keyLabel.BackgroundTransparency = 1
+		keyLabel.Position = UDim2.fromOffset(6, 4)
+		keyLabel.Size = UDim2.fromOffset(16, 16)
+		keyLabel.Font = Enum.Font.GothamBold
+		keyLabel.Text = tostring(i)
+		keyLabel.TextColor3 = Color3.fromRGB(235, 238, 246)
+		keyLabel.TextSize = 13
+		keyLabel.TextXAlignment = Enum.TextXAlignment.Left
+		keyLabel.TextYAlignment = Enum.TextYAlignment.Top
+		keyLabel.Parent = button
 
 		local weaponName = SLOT_WEAPONS[i]
-		if weaponName then
-			button.Text = tostring(i) .. "\n" .. weaponName
-		else
-			button.Text = tostring(i) .. "\nEmpty"
-			button.TextColor3 = Color3.fromRGB(140, 140, 140)
-		end
+		slotIcons[i] = createWeaponIcon(button, weaponName)
 
 		slotButtons[i] = button
 
@@ -272,6 +359,19 @@ player.CharacterAdded:Connect(function(character)
 	end)
 
 	task.defer(syncSelectedSlotFromCharacter)
+end)
+
+local backpack = player:WaitForChild("Backpack")
+backpack.ChildAdded:Connect(function(child)
+	if child:IsA("Tool") then
+		task.defer(updateHighlight)
+	end
+end)
+
+backpack.ChildRemoved:Connect(function(child)
+	if child:IsA("Tool") then
+		task.defer(updateHighlight)
+	end
 end)
 
 if player.Character then

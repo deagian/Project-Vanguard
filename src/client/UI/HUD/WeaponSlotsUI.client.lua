@@ -10,6 +10,7 @@
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
 local ContextActionService = game:GetService("ContextActionService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local ACTION_NAME = "PV_WeaponSlots_Input"
@@ -28,7 +29,14 @@ local SLOT_WEAPONS = {
 local slotButtons = {}
 local slotStrokes = {}
 local slotIcons = {}
+local slotScales = {}
+local slotTweens = {}
+local slotAnimationTokens = {}
 local selectedSlot = nil
+
+local SLOT_BOUNCE_UP = TweenInfo.new(0.08, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local SLOT_BOUNCE_DOWN = TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+local SLOT_FADE_TWEEN = TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 
 -- Rojo / hot-sync safety
 ContextActionService:UnbindAction(ACTION_NAME)
@@ -129,7 +137,78 @@ local function updateHighlight()
 	end
 end
 
+local function cancelSlotTweens(slotNumber)
+	local tweens = slotTweens[slotNumber]
+	if not tweens then
+		return
+	end
+
+	for _, tween in ipairs(tweens) do
+		tween:Cancel()
+	end
+
+	slotTweens[slotNumber] = nil
+end
+
+local function animateSlot(slotNumber)
+	local button = slotButtons[slotNumber]
+	local scale = slotScales[slotNumber]
+	local stroke = slotStrokes[slotNumber]
+	if not button or not scale then
+		return
+	end
+
+	cancelSlotTweens(slotNumber)
+
+	scale.Scale = 1
+	slotAnimationTokens[slotNumber] = (slotAnimationTokens[slotNumber] or 0) + 1
+	local animationToken = slotAnimationTokens[slotNumber]
+
+	local growTween = TweenService:Create(scale, SLOT_BOUNCE_UP, {
+		Scale = 1.12,
+	})
+
+	local settleTween = TweenService:Create(scale, SLOT_BOUNCE_DOWN, {
+		Scale = 1,
+	})
+
+	local brightenTween = TweenService:Create(button, SLOT_FADE_TWEEN, {
+		BackgroundColor3 = Color3.fromRGB(58, 106, 190),
+	})
+
+	local strokeTween = nil
+	if stroke then
+		strokeTween = TweenService:Create(stroke, SLOT_FADE_TWEEN, {
+			Color = Color3.fromRGB(170, 205, 255),
+			Thickness = 4,
+		})
+	end
+
+	slotTweens[slotNumber] = if strokeTween then { growTween, settleTween, brightenTween, strokeTween } else { growTween, settleTween, brightenTween }
+
+	growTween.Completed:Connect(function(playbackState)
+		if playbackState == Enum.PlaybackState.Completed and slotAnimationTokens[slotNumber] == animationToken then
+			settleTween:Play()
+			task.delay(0.08, updateHighlight)
+		end
+	end)
+
+	settleTween.Completed:Connect(function()
+		if slotAnimationTokens[slotNumber] == animationToken and slotTweens[slotNumber] then
+			slotTweens[slotNumber] = nil
+		end
+		updateHighlight()
+	end)
+
+	growTween:Play()
+	brightenTween:Play()
+	if strokeTween then
+		strokeTween:Play()
+	end
+end
+
 local function syncSelectedSlotFromCharacter()
+	local previousSlot = selectedSlot
 	selectedSlot = nil
 
 	local equippedTool = getEquippedTool()
@@ -143,6 +222,9 @@ local function syncSelectedSlotFromCharacter()
 	end
 
 	updateHighlight()
+	if selectedSlot and selectedSlot ~= previousSlot then
+		animateSlot(selectedSlot)
+	end
 end
 
 local function unequipCurrentWeapon()
@@ -184,6 +266,7 @@ local function equipSlot(slotNumber)
 	humanoid:EquipTool(tool)
 	selectedSlot = slotNumber
 	updateHighlight()
+	animateSlot(slotNumber)
 end
 
 local function createCorner(parent, radius)
@@ -270,6 +353,11 @@ local function createUI()
 		button.Text = ""
 		button.Parent = root
 		createCorner(button, 6)
+
+		local scale = Instance.new("UIScale")
+		scale.Scale = 1
+		scale.Parent = button
+		slotScales[i] = scale
 
 		local stroke = Instance.new("UIStroke")
 		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border

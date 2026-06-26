@@ -55,7 +55,7 @@ local function getSoundParent(tool)
 end
 
 local function playTemporarySound(tool, soundId, volume)
-	if soundId == "" then
+	if not soundId or soundId == "" then
 		return
 	end
 

@@ -33,10 +33,16 @@ local slotScales = {}
 local slotTweens = {}
 local slotAnimationTokens = {}
 local selectedSlot = nil
+local slotsRoot = nil
+local slotsFadeTween = nil
+local fadeToken = 0
 
 local SLOT_BOUNCE_UP = TweenInfo.new(0.08, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local SLOT_BOUNCE_DOWN = TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 local SLOT_FADE_TWEEN = TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+local SLOTS_FADE_DELAY = 3
+local SLOTS_FADED_TRANSPARENCY = 0.88
+local SLOTS_FADE_INFO = TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 
 -- Rojo / hot-sync safety
 ContextActionService:UnbindAction(ACTION_NAME)
@@ -137,6 +143,50 @@ local function updateHighlight()
 	end
 end
 
+local function fadeSlots()
+	if not slotsRoot then
+		return
+	end
+
+	if slotsFadeTween then
+		slotsFadeTween:Cancel()
+	end
+
+	slotsFadeTween = TweenService:Create(slotsRoot, SLOTS_FADE_INFO, {
+		GroupTransparency = SLOTS_FADED_TRANSPARENCY,
+	})
+	slotsFadeTween:Play()
+end
+
+local function scheduleFade()
+	fadeToken += 1
+	local scheduledToken = fadeToken
+
+	task.delay(SLOTS_FADE_DELAY, function()
+		if fadeToken == scheduledToken then
+			fadeSlots()
+		end
+	end)
+end
+
+local function showSlots()
+	fadeToken += 1
+
+	if slotsFadeTween then
+		slotsFadeTween:Cancel()
+		slotsFadeTween = nil
+	end
+
+	if slotsRoot then
+		slotsRoot.GroupTransparency = 0
+	end
+end
+
+local function noteSlotActivity()
+	showSlots()
+	scheduleFade()
+end
+
 local function cancelSlotTweens(slotNumber)
 	local tweens = slotTweens[slotNumber]
 	if not tweens then
@@ -223,6 +273,7 @@ local function syncSelectedSlotFromCharacter()
 
 	updateHighlight()
 	if selectedSlot and selectedSlot ~= previousSlot then
+		noteSlotActivity()
 		animateSlot(selectedSlot)
 	end
 end
@@ -235,6 +286,7 @@ local function unequipCurrentWeapon()
 
 	selectedSlot = nil
 	updateHighlight()
+	noteSlotActivity()
 end
 
 local function equipSlot(slotNumber)
@@ -266,6 +318,7 @@ local function equipSlot(slotNumber)
 	humanoid:EquipTool(tool)
 	selectedSlot = slotNumber
 	updateHighlight()
+	noteSlotActivity()
 	animateSlot(slotNumber)
 end
 
@@ -328,13 +381,15 @@ local function createUI()
 	screenGui.IgnoreGuiInset = true
 	screenGui.Parent = playerGui
 
-	local root = Instance.new("Frame")
+	local root = Instance.new("CanvasGroup")
 	root.Name = "Root"
 	root.AnchorPoint = Vector2.new(0.5, 1)
 	root.Position = UDim2.new(0.5, 0, 1, -35)
 	root.Size = UDim2.new(0, 360, 0, 70)
 	root.BackgroundTransparency = 1
+	root.GroupTransparency = 0
 	root.Parent = screenGui
+	slotsRoot = root
 
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
@@ -385,11 +440,13 @@ local function createUI()
 		slotButtons[i] = button
 
 		button.MouseButton1Click:Connect(function()
+			noteSlotActivity()
 			equipSlot(i)
 		end)
 	end
 
 	updateHighlight()
+	noteSlotActivity()
 end
 
 local function onInput(actionName, inputState, inputObject)
@@ -402,6 +459,7 @@ local function onInput(actionName, inputState, inputObject)
 	end
 
 	local keyCode = inputObject.KeyCode
+	noteSlotActivity()
 
 	if keyCode == Enum.KeyCode.One then
 		equipSlot(1)
@@ -433,6 +491,7 @@ ContextActionService:BindAction(
 
 player.CharacterAdded:Connect(function(character)
 	hideDefaultBackpack()
+	noteSlotActivity()
 
 	character.ChildAdded:Connect(function(child)
 		if child:IsA("Tool") then

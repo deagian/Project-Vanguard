@@ -1,0 +1,15 @@
+{
+  "className": "Tool",
+  "properties": {
+    "RequiresHandle": true,
+    "CanBeDropped": false,
+    "Grip": [
+      0, -0.18, -0.5,
+      1, 0, 0,
+      0, 1, 0,
+      0, 0, 1
+    ],
+    "TextureId": "rbxassetid://92628145",
+    "ToolTip": "SMG"
+  }
+}

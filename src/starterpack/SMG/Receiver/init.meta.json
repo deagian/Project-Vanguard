@@ -1,0 +1,17 @@
+{
+  "className": "Part",
+  "properties": {
+    "Anchored": false,
+    "CanCollide": false,
+    "CanQuery": false,
+    "CanTouch": false,
+    "CastShadow": false,
+    "Color": [0.035, 0.037, 0.042],
+    "Material": "SmoothPlastic",
+    "Massless": true,
+    "Shape": "Block",
+    "Size": [0.38, 0.26, 0.82],
+    "TopSurface": "Smooth",
+    "BottomSurface": "Smooth"
+  }
+}

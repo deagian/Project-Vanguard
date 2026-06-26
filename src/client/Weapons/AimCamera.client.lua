@@ -13,6 +13,7 @@ local player = Players.LocalPlayer
 local SUPPORTED_WEAPONS = {
 	Pistol = true,
 	AssaultRifle = true,
+	SMG = true,
 }
 
 local connectedTools = {}

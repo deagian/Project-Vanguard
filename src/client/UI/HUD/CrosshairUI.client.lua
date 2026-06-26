@@ -8,6 +8,7 @@ local player = Players.LocalPlayer
 local SUPPORTED_WEAPONS = {
 	Pistol = true,
 	AssaultRifle = true,
+	SMG = true,
 }
 
 local CROSSHAIR_TWEEN_INFO = TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)

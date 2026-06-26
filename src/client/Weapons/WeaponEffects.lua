@@ -8,6 +8,7 @@ local DEFAULT_FIRE_SOUND_ID = "rbxassetid://9119561046"
 local FIRE_SOUND_IDS = {
 	Pistol = DEFAULT_FIRE_SOUND_ID,
 	AssaultRifle = DEFAULT_FIRE_SOUND_ID,
+	SMG = DEFAULT_FIRE_SOUND_ID,
 }
 
 local function findDescendantBasePart(root, name)
@@ -159,8 +160,8 @@ function WeaponEffects.PlayFireSound(tool, weaponName)
 
 	local sound = Instance.new("Sound")
 	sound.SoundId = soundId
-	sound.Volume = if weaponName == "AssaultRifle" then 0.58 else 0.75
-	sound.RollOffMaxDistance = if weaponName == "AssaultRifle" then 120 else 80
+	sound.Volume = if weaponName == "AssaultRifle" or weaponName == "SMG" then 0.58 else 0.75
+	sound.RollOffMaxDistance = if weaponName == "AssaultRifle" or weaponName == "SMG" then 120 else 80
 	sound.Parent = getSoundParent(tool)
 	sound:Play()
 

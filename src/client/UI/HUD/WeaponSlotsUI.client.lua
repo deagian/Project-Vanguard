@@ -3,8 +3,9 @@
 -- One-file weapon slot UI.
 -- Slot 1 = Pistol
 -- Slot 2 = AssaultRifle
+-- Slot 3 = SMG
 -- Press same slot again = unequip weapon
--- Slots 3/4/5 empty
+-- Slots 4/5 empty
 -- Weapon names are intentionally not shown in the HUD.
 
 local Players = game:GetService("Players")
@@ -21,7 +22,7 @@ local SLOT_COUNT = 5
 local SLOT_WEAPONS = {
 	[1] = "Pistol",
 	[2] = "AssaultRifle",
-	[3] = nil,
+	[3] = "SMG",
 	[4] = nil,
 	[5] = nil,
 }
@@ -393,6 +394,12 @@ local function createWeaponIcon(parent, weaponName)
 		createIconPart(icon, "Stock", UDim2.fromScale(0.14, 0.47), UDim2.fromOffset(16, 8), -18, accent)
 		createIconPart(icon, "Grip", UDim2.fromScale(0.43, 0.69), UDim2.fromOffset(7, 16), 16, accent)
 		createIconPart(icon, "Magazine", UDim2.fromScale(0.58, 0.72), UDim2.fromOffset(8, 17), -9, accent)
+	elseif weaponName == "SMG" then
+		createIconPart(icon, "Receiver", UDim2.fromScale(0.47, 0.43), UDim2.fromOffset(25, 8), 0, color)
+		createIconPart(icon, "Barrel", UDim2.fromScale(0.73, 0.4), UDim2.fromOffset(15, 4), 0, color)
+		createIconPart(icon, "Stock", UDim2.fromScale(0.18, 0.47), UDim2.fromOffset(11, 6), -12, accent)
+		createIconPart(icon, "Grip", UDim2.fromScale(0.4, 0.68), UDim2.fromOffset(7, 15), 14, accent)
+		createIconPart(icon, "Magazine", UDim2.fromScale(0.58, 0.7), UDim2.fromOffset(7, 15), 5, accent)
 	else
 		createIconPart(icon, "EmptyLine", UDim2.fromScale(0.5, 0.5), UDim2.fromOffset(24, 3), 0, Color3.fromRGB(98, 102, 112))
 	end

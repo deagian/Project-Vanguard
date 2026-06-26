@@ -27,6 +27,20 @@ local WeaponConfig = {
 		ADSRecoilMultiplier = 0.55,
 		Automatic = true,
 	},
+
+	SMG = {
+		Damage = 12,
+		HeadshotMultiplier = 1.6,
+		Range = 330,
+		FireCooldown = 0.065,
+		MagazineSize = 25,
+		ReloadTime = 1.8,
+		HipFireSpread = 3.0,
+		ADSSpread = 1.25,
+		Recoil = 0.48,
+		ADSRecoilMultiplier = 0.6,
+		Automatic = true,
+	},
 }
 
 return WeaponConfig

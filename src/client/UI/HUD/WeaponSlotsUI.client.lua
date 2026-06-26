@@ -40,6 +40,26 @@ local fadeToken = 0
 local SLOT_BOUNCE_UP = TweenInfo.new(0.08, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local SLOT_BOUNCE_DOWN = TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 local SLOT_FADE_TWEEN = TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+local SLOT_FEEDBACK = {
+	equip = {
+		scale = 1.16,
+		backgroundColor = Color3.fromRGB(70, 125, 220),
+		strokeColor = Color3.fromRGB(190, 220, 255),
+		strokeThickness = 4,
+	},
+	selected = {
+		scale = 1.13,
+		backgroundColor = Color3.fromRGB(58, 106, 190),
+		strokeColor = Color3.fromRGB(170, 205, 255),
+		strokeThickness = 4,
+	},
+	denied = {
+		scale = 1.06,
+		backgroundColor = Color3.fromRGB(86, 62, 68),
+		strokeColor = Color3.fromRGB(180, 118, 128),
+		strokeThickness = 2,
+	},
+}
 local SLOTS_FADE_DELAY = 3
 local SLOTS_FADED_TRANSPARENCY = 0.88
 local SLOTS_FADE_INFO = TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
@@ -200,13 +220,15 @@ local function cancelSlotTweens(slotNumber)
 	slotTweens[slotNumber] = nil
 end
 
-local function animateSlot(slotNumber)
+local function animateSlot(slotNumber, mode)
 	local button = slotButtons[slotNumber]
 	local scale = slotScales[slotNumber]
 	local stroke = slotStrokes[slotNumber]
 	if not button or not scale then
 		return
 	end
+
+	local feedback = SLOT_FEEDBACK[mode] or SLOT_FEEDBACK.selected
 
 	cancelSlotTweens(slotNumber)
 
@@ -215,7 +237,7 @@ local function animateSlot(slotNumber)
 	local animationToken = slotAnimationTokens[slotNumber]
 
 	local growTween = TweenService:Create(scale, SLOT_BOUNCE_UP, {
-		Scale = 1.12,
+		Scale = feedback.scale,
 	})
 
 	local settleTween = TweenService:Create(scale, SLOT_BOUNCE_DOWN, {
@@ -223,14 +245,14 @@ local function animateSlot(slotNumber)
 	})
 
 	local brightenTween = TweenService:Create(button, SLOT_FADE_TWEEN, {
-		BackgroundColor3 = Color3.fromRGB(58, 106, 190),
+		BackgroundColor3 = feedback.backgroundColor,
 	})
 
 	local strokeTween = nil
 	if stroke then
 		strokeTween = TweenService:Create(stroke, SLOT_FADE_TWEEN, {
-			Color = Color3.fromRGB(170, 205, 255),
-			Thickness = 4,
+			Color = feedback.strokeColor,
+			Thickness = feedback.strokeThickness,
 		})
 	end
 
@@ -274,7 +296,7 @@ local function syncSelectedSlotFromCharacter()
 	updateHighlight()
 	if selectedSlot and selectedSlot ~= previousSlot then
 		noteSlotActivity()
-		animateSlot(selectedSlot)
+		animateSlot(selectedSlot, "selected")
 	end
 end
 
@@ -292,6 +314,7 @@ end
 local function equipSlot(slotNumber)
 	local weaponName = SLOT_WEAPONS[slotNumber]
 	if not weaponName then
+		animateSlot(slotNumber, "denied")
 		return
 	end
 
@@ -300,6 +323,7 @@ local function equipSlot(slotNumber)
 	-- Same slot pressed again: put weapon down
 	if equippedTool and equippedTool.Name == weaponName then
 		unequipCurrentWeapon()
+		animateSlot(slotNumber, "selected")
 		return
 	end
 
@@ -307,11 +331,13 @@ local function equipSlot(slotNumber)
 	if not tool then
 		selectedSlot = nil
 		updateHighlight()
+		animateSlot(slotNumber, "denied")
 		return
 	end
 
 	local humanoid = getHumanoid()
 	if not humanoid then
+		animateSlot(slotNumber, "denied")
 		return
 	end
 
@@ -319,7 +345,7 @@ local function equipSlot(slotNumber)
 	selectedSlot = slotNumber
 	updateHighlight()
 	noteSlotActivity()
-	animateSlot(slotNumber)
+	animateSlot(slotNumber, "equip")
 end
 
 local function createCorner(parent, radius)
